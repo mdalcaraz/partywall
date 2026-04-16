@@ -116,7 +116,7 @@ app.post(`${BASE}/api/upload`, upload.single('photo'), (req, res) => {
 app.get(`${BASE}/api/photos`,  requireAuth, (req, res) => res.json(photos));
 app.get(`${BASE}/api/display`, requireAuth, (req, res) => res.json({ current: currentDisplay, slideshow }));
 
-app.get(`${BASE}/api/qr`, requireAuth, async (req, res) => {
+app.get(`${BASE}/api/qr`, async (req, res) => {
   const base = TUNNEL_URL || `http://${LOCAL_IP}:${PORT}`;
   const url  = `${base}${BASE}/guest`;
   const qr   = await QRCode.toDataURL(url, { width: 300, margin: 2, color: { dark: '#000', light: '#fff' } });
