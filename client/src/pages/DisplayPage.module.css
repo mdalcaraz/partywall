@@ -1,0 +1,143 @@
+.page {
+  width: 100%; height: 100dvh;
+  background: #000;
+  overflow: hidden;
+  cursor: none;
+  position: relative;
+}
+
+.bgBlur {
+  position: fixed; inset: 0;
+  background-size: cover; background-position: center;
+  filter: blur(40px) brightness(.3) saturate(1.2);
+  transform: scale(1.1);
+  opacity: 0; transition: opacity 1.2s ease;
+}
+.bgBlurShow { opacity: 1; }
+
+.stage {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.imgSlot {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .8s ease;
+}
+.slotActive { opacity: 1; }
+.imgSlot img {
+  max-width: 100%; max-height: 100%;
+  object-fit: contain; display: block;
+  border-radius: 4px;
+  box-shadow: 0 0 80px rgba(0,0,0,.95);
+}
+
+/* ── Idle screen ── */
+.idleScreen {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 32px;
+  background: radial-gradient(ellipse at center, #0e0e0e 0%, #000 70%);
+  transition: opacity .6s; z-index: 1;
+}
+.idleHidden { opacity: 0; pointer-events: none; }
+
+.idleLogo {
+  width: clamp(160px, 30vw, 280px);
+  filter: drop-shadow(0 0 40px rgba(200,160,66,.3));
+  animation: gold-pulse 3s ease infinite;
+}
+.idleSub {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(1rem, 2.5vw, 1.6rem);
+  color: rgba(200,160,66,.4);
+  letter-spacing: .4em;
+  text-transform: uppercase;
+}
+
+/* ── Particles ── */
+.particles { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.particle {
+  position: absolute; border-radius: 50%;
+  background: rgba(200,160,66,.12);
+  animation: drift linear infinite;
+}
+
+/* ── Info overlay ── */
+.infoOverlay {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  padding: 0 32px 28px;
+  background: linear-gradient(to top, rgba(0,0,0,.65) 0%, transparent 100%);
+  display: flex; align-items: flex-end; justify-content: space-between;
+  opacity: 0; transition: opacity .5s;
+  pointer-events: none; z-index: 2;
+}
+.infoShow { opacity: 1; }
+.brandLogo {
+  height: 36px;
+  filter: drop-shadow(0 0 12px rgba(200,160,66,.4));
+  opacity: .85;
+}
+.igHandle {
+  font-family: 'DM Sans', sans-serif;
+  font-size: .9rem;
+  color: rgba(200,160,66,.5);
+  letter-spacing: .05em;
+}
+
+/* ── QR corner ── */
+.qrCorner {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 4;
+  background: rgba(8,8,8,.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(200,160,66,.25);
+  border-radius: 14px;
+  padding: 10px 10px 8px;
+}
+.qrLabel {
+  font-family: 'DM Sans', sans-serif;
+  font-size: clamp(.55rem, 1vw, .75rem);
+  color: rgba(200,160,66,.85);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-align: center;
+  max-width: 120px;
+  line-height: 1.3;
+}
+.qrImg {
+  width: clamp(80px, 9vw, 130px);
+  height: clamp(80px, 9vw, 130px);
+  border-radius: 6px;
+  display: block;
+}
+
+/* ── Slideshow bar ── */
+.ssBar {
+  position: fixed; bottom: 0; left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--gold), var(--gold2));
+  transition: width 50ms linear; z-index: 3;
+}
+
+/* ── Notification ── */
+.notif {
+  position: fixed; top: 24px; right: 24px;
+  background: rgba(8,8,8,.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(200,160,66,.2);
+  border-radius: 12px; padding: 10px 16px;
+  color: rgba(200,160,66,.8);
+  font-family: 'DM Sans', sans-serif; font-size: .82rem;
+  transform: translateX(120%);
+  transition: transform .4s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: none; z-index: 10;
+}
+.notifShow { transform: translateX(0); }

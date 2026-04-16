@@ -1,0 +1,37 @@
+# Dependencias
+node_modules/
+client/node_modules/
+
+# Build output (generado por `npm run build` en client/)
+public/assets/
+
+# Archivos de entorno — nunca commitear credenciales
+.env
+.env.local
+.env.*.local
+
+# Fotos subidas por usuarios
+uploads/
+
+# Binario de cloudflare tunnel
+cloudflared.exe
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Vite
+client/.vite/

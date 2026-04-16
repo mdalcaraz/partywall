@@ -1,0 +1,15 @@
+# Copiar este contenido en:
+# C:\Users\TuUsuario\.cloudflared\config.yml
+
+tunnel: <ID-del-tunnel>
+credentials-file: C:\Users\TuUsuario\.cloudflared\<ID-del-tunnel>.json
+
+ingress:
+  # Solo rutea /fotobooth/* al servidor local
+  # El resto de topdjgroup.com sigue siendo tu web normal
+  - hostname: topdjgroup.com
+    path: /fotobooth/*
+    service: http://localhost:3000
+
+  # Todo lo demás → 404 (Cloudflare no lo intercepta)
+  - service: http_status:404

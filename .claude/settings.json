@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(node server.js)",
+      "Bash(curl -sk https://localhost:3000/guest -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -sk https://localhost:3000/admin -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -sk https://localhost:3000/display -o /dev/null -w \"%{http_code}\")",
+      "Bash(kill %1)",
+      "WebFetch(domain:topdjgroup.com)",
+      "WebFetch(domain:www.instagram.com)"
+    ]
+  }
+}
