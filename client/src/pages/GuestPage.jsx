@@ -29,6 +29,7 @@ export default function GuestPage() {
   const videoRef  = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
+  const fileRef   = useRef(null)
 
   const [mode, setMode]               = useState('camera')
   const [facingMode, setFacingMode]   = useState('user')
@@ -40,14 +41,22 @@ export default function GuestPage() {
   const [timerCount, setTimerCount]   = useState(null)
   const [showFlash, setShowFlash]     = useState(false)
   const [cameraError, setCameraError] = useState(false)
+  const [cooldown, setCooldown]       = useState(0)
+  const cooldownRef = useRef(null)
 
   const timerDelay = TIMER_OPTIONS[timerIdx]
 
   const startCamera = useCallback(async (facing) => {
     try {
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop())
+      const landscape = window.matchMedia('(orientation: landscape)').matches
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 960 } },
+        video: {
+          facingMode: facing,
+          width:  { ideal: landscape ? 1920 : 1080 },
+          height: { ideal: landscape ? 1080 : 1920 },
+          aspectRatio: { ideal: landscape ? 16 / 9 : 9 / 16 },
+        },
         audio: false,
       })
       streamRef.current = stream
@@ -60,9 +69,16 @@ export default function GuestPage() {
   }, [])
 
   useEffect(() => {
-    startCamera('user')
+    startCamera(facingMode)
     return () => streamRef.current?.getTracks().forEach((t) => t.stop())
-  }, [startCamera])
+  }, [startCamera]) // eslint-disable-line
+
+  useEffect(() => {
+    const mq = window.matchMedia('(orientation: landscape)')
+    const handleOrientationChange = () => startCamera(facingMode)
+    mq.addEventListener('change', handleOrientationChange)
+    return () => mq.removeEventListener('change', handleOrientationChange)
+  }, [facingMode, startCamera])
 
   const flipCamera = async () => {
     const next = facingMode === 'user' ? 'environment' : 'user'
@@ -72,6 +88,14 @@ export default function GuestPage() {
 
   const toggleTimer = () => setTimerIdx((i) => (i + 1) % TIMER_OPTIONS.length)
 
+  const torch = async (on) => {
+    try {
+      const track = streamRef.current?.getVideoTracks()[0]
+      if (!track) return
+      await track.applyConstraints({ advanced: [{ torch: on }] })
+    } catch { /* torch not supported on this device */ }
+  }
+
   const capture = async () => {
     if (timerDelay > 0) {
       for (let i = timerDelay; i >= 1; i--) {
@@ -80,8 +104,11 @@ export default function GuestPage() {
       }
       setTimerCount(null)
     }
+
+    await torch(true)
+    await wait(220)
     setShowFlash(true)
-    setTimeout(() => setShowFlash(false), 120)
+    setTimeout(() => setShowFlash(false), 400)
 
     const video  = videoRef.current
     const canvas = canvasRef.current
@@ -90,6 +117,7 @@ export default function GuestPage() {
     const ctx = canvas.getContext('2d')
     if (facingMode === 'user') { ctx.translate(canvas.width, 0); ctx.scale(-1, 1) }
     ctx.drawImage(video, 0, 0)
+    setTimeout(() => torch(false), 300)
 
     canvas.toBlob((blob) => {
       setCapturedBlob(blob)
@@ -108,6 +136,13 @@ export default function GuestPage() {
     try {
       const res  = await fetch(`${import.meta.env.BASE_URL}api/upload`, { method: 'POST', body: fd })
       const data = await res.json()
+      if (res.status === 429) {
+        const secs = data.retryAfter || 60
+        setMode('camera')
+        setStatus({ text: '', type: '' })
+        startCooldown(secs)
+        return
+      }
       if (!data.success) throw new Error(data.error)
       setSentCount((c) => c + 1)
       launchConfetti()
@@ -120,6 +155,27 @@ export default function GuestPage() {
     }
   }
 
+  const startCooldown = (secs) => {
+    setCooldown(secs)
+    clearInterval(cooldownRef.current)
+    cooldownRef.current = setInterval(() => {
+      setCooldown((c) => {
+        if (c <= 1) { clearInterval(cooldownRef.current); return 0 }
+        return c - 1
+      })
+    }, 1000)
+  }
+
+  const pickFromGallery = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCapturedBlob(file)
+    setPreviewUrl(URL.createObjectURL(file))
+    setMode('preview')
+    setStatus({ text: '¿Te gustó? Enviala ✨', type: '' })
+    e.target.value = ''
+  }
+
   const resetToCamera = () => {
     setCapturedBlob(null)
     if (previewUrl) URL.revokeObjectURL(previewUrl)
@@ -129,7 +185,7 @@ export default function GuestPage() {
   }
 
   const isPreview = mode === 'preview' || mode === 'sending' || mode === 'sent'
-  const isBusy    = mode === 'sending' || timerCount !== null
+  const isBusy    = mode === 'sending' || timerCount !== null || cooldown > 0
 
   return (
     <div className={s.page}>
@@ -200,6 +256,18 @@ export default function GuestPage() {
           </div>
         )}
 
+        {!isPreview && (
+          <button className={s.btnGallery} onClick={() => fileRef.current?.click()}>
+            🖼 Elegir de galería
+          </button>
+        )}
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickFromGallery} />
+
+        {cooldown > 0 && (
+          <div className={s.cooldown}>
+            Límite alcanzado — esperá <strong>{cooldown}s</strong>
+          </div>
+        )}
         <div className={`${s.status} ${s[status.type]}`}>{status.text}</div>
       </div>
 

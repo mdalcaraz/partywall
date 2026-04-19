@@ -95,9 +95,35 @@ app.post(`${BASE}/api/login`, (req, res) => {
   }
 });
 
+// ── Rate limit uploads ────────────────────────────────────────────────────
+const uploadLimits = new Map();
+const RL_MAX    = 3;
+const RL_WINDOW = 60 * 1000;
+
+function checkUploadLimit(req) {
+  const ip  = req.headers['cf-connecting-ip'] || req.ip;
+  const now = Date.now();
+  const entry = uploadLimits.get(ip) || { timestamps: [] };
+  entry.timestamps = entry.timestamps.filter(t => now - t < RL_WINDOW);
+  if (entry.timestamps.length >= RL_MAX) {
+    const retryAfter = Math.ceil((entry.timestamps[0] + RL_WINDOW - now) / 1000);
+    uploadLimits.set(ip, entry);
+    return { allowed: false, retryAfter };
+  }
+  entry.timestamps.push(now);
+  uploadLimits.set(ip, entry);
+  return { allowed: true };
+}
+
 // ── API ───────────────────────────────────────────────────────────────────
 app.post(`${BASE}/api/upload`, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Sin archivo' });
+
+  const limit = checkUploadLimit(req);
+  if (!limit.allowed) {
+    fs.unlinkSync(req.file.path);
+    return res.status(429).json({ error: 'Límite alcanzado', retryAfter: limit.retryAfter });
+  }
 
   const photo = {
     id:          path.basename(req.file.filename, path.extname(req.file.filename)),

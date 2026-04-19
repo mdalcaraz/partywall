@@ -9,7 +9,23 @@
       "Bash(curl -sk https://localhost:3000/display -o /dev/null -w \"%{http_code}\")",
       "Bash(kill %1)",
       "WebFetch(domain:topdjgroup.com)",
-      "WebFetch(domain:www.instagram.com)"
+      "WebFetch(domain:www.instagram.com)",
+      "Bash(curl -A \"Mozilla/5.0\" -s \"https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap\")",
+      "Bash(curl -s -o bebas-neue.woff2 \"https://fonts.gstatic.com/s/bebasneue/v16/JTUSjIg69CK48gW7PXoo9Wdhyzbi.woff2\")",
+      "Bash(curl -s -o dm-sans-300.woff2 \"https://fonts.gstatic.com/s/dmsans/v17/rP2Yp2ywxg089UriI5-g4vlH9VoD8Cmcqbu6-K6h9Q.woff2\")",
+      "Bash(curl -s -o dm-sans-400.woff2 \"https://fonts.gstatic.com/s/dmsans/v17/rP2Yp2ywxg089UriI5-g4vlH9VoD8Cmcqbu0-K4.woff2\")",
+      "Bash(curl -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36\" -s \"https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap\")",
+      "Bash(curl -s -o bebas-neue-latin.woff2 \"https://fonts.gstatic.com/s/bebasneue/v16/JTUSjIg69CK48gW7PXoo9Wlhyw.woff2\")",
+      "Bash(mv bebas-neue.woff2 bebas-neue-latin-ext.woff2)",
+      "Bash(mv dm-sans-300.woff2 dm-sans-latin-ext.woff2)",
+      "Bash(mv dm-sans-400.woff2 dm-sans-latin.woff2)",
+      "Bash(curl -s https://topdjgroup.com/)",
+      "Bash(curl -s https://topdjgroup.com/css/styles.css)",
+      "Bash(curl -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36\" -s \"https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Inter:wght@300;400;500;600&display=swap\")",
+      "Bash(awk '/\\\\/\\\\* latin \\\\*\\\\//{p=1} p && /src:/{print; p=0}')",
+      "Bash(curl -s -o cormorant-italic-300-latin.woff2 \"https://fonts.gstatic.com/s/cormorantgaramond/v21/co3smX5slCNuHLi8bLeY9MK7whWMhyjYrGFEsdtdc62E6zd5rDD-iNM8.woff2\")",
+      "Bash(curl -s -o cormorant-300-latin.woff2 \"https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtK.woff2\")",
+      "Bash(curl -s -o inter-latin.woff2 \"https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2\")"
     ]
   }
 }

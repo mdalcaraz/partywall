@@ -49,10 +49,11 @@
   animation: gold-pulse 3s ease infinite;
 }
 .idleSub {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(1rem, 2.5vw, 1.6rem);
+  font-family: var(--font-body);
+  font-size: clamp(.7rem, 1.5vw, 1rem);
+  font-weight: 300;
   color: rgba(200,160,66,.4);
-  letter-spacing: .4em;
+  letter-spacing: .35em;
   text-transform: uppercase;
 }
 
@@ -80,10 +81,12 @@
   opacity: .85;
 }
 .igHandle {
-  font-family: 'DM Sans', sans-serif;
-  font-size: .9rem;
+  font-family: var(--font-body);
+  font-size: .78rem;
+  font-weight: 300;
   color: rgba(200,160,66,.5);
-  letter-spacing: .05em;
+  letter-spacing: .18em;
+  text-transform: uppercase;
 }
 
 /* ── QR corner ── */
@@ -103,14 +106,15 @@
   padding: 10px 10px 8px;
 }
 .qrLabel {
-  font-family: 'DM Sans', sans-serif;
-  font-size: clamp(.55rem, 1vw, .75rem);
+  font-family: var(--font-body);
+  font-size: clamp(.5rem, .9vw, .68rem);
+  font-weight: 500;
   color: rgba(200,160,66,.85);
-  letter-spacing: .06em;
+  letter-spacing: .18em;
   text-transform: uppercase;
   text-align: center;
   max-width: 120px;
-  line-height: 1.3;
+  line-height: 1.4;
 }
 .qrImg {
   width: clamp(80px, 9vw, 130px);

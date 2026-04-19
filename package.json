@@ -4,7 +4,9 @@
   "description": "Photo booth LAN server para eventos",
   "main": "server.js",
   "scripts": {
-    "dev": "nodemon server.js"
+    "client-build": "cd client && npm install && npm run build",
+    "server": "nodemon server.js",
+    "dev": "concurrently \"npm run client-build\" \"npm run server\""
   },
   "dependencies": {
     "dotenv": "^17.4.2",
@@ -14,5 +16,8 @@
     "qrcode": "^1.5.3",
     "selfsigned": "^2.4.1",
     "socket.io": "^4.7.4"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

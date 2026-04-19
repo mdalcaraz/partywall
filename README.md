@@ -97,3 +97,10 @@ Cambiar tamaño máximo de foto:
 ```js
 limits: { fileSize: 15 * 1024 * 1024 } // en bytes
 ```
+
+
+
+CORRER:
+ /f/fotobooth/cloudflared.exe tunnel --url http://localhost:3000
+ Copiar la url que da y ponerla en el .env
+ luego en otor terminal npm run dev

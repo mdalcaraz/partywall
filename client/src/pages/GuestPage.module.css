@@ -43,7 +43,7 @@
 }
 .viewfinder {
   width: 100%;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 9 / 16;
   border-radius: var(--radius);
   overflow: hidden;
   position: relative;
@@ -144,20 +144,51 @@
 .btn {
   flex: 1; height: 50px;
   border-radius: 12px; border: none;
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-body);
   font-size: .95rem; font-weight: 500;
   cursor: pointer; transition: all .2s;
   display: flex; align-items: center; justify-content: center; gap: 8px;
 }
 .btn:active { transform: scale(.97); }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
-.btnSecondary { background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
-.btnPrimary {
-  background: linear-gradient(135deg, var(--gold), var(--gold2));
-  color: #080808;
-  font-weight: 700;
-  letter-spacing: .03em;
+.btnSecondary {
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+  text-transform: uppercase; letter-spacing: .12em; font-size: .8rem;
+  transition: border-color .4s var(--ease), color .4s var(--ease);
 }
+.btnSecondary:hover { border-color: var(--gold); color: var(--gold); }
+.btnPrimary {
+  background: var(--gold);
+  color: #080808;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  transition: background .4s var(--ease), transform .2s;
+}
+.btnPrimary:hover { background: var(--accent-hover); }
+
+.btnGallery {
+  background: transparent;
+  border: 1px solid var(--gold2);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-family: var(--font-body);
+  font-size: .8rem;
+  cursor: pointer;
+  transition: all .2s;
+  font:bold;
+  
+}
+.btnGallery:hover { border-color: var(--gold); color: var(--gold); }
+
+.cooldown {
+  font-size: .82rem; color: var(--gold);
+  text-align: center; padding: 6px 14px;
+  border: 1px solid rgba(200,160,66,.3);
+  border-radius: 8px; background: rgba(200,160,66,.07);
+}
+.cooldown strong { font-weight: 700; }
 
 .status { font-size: .8rem; color: var(--muted); text-align: center; min-height: 20px; transition: all .3s; }
 .ok      { color: var(--green); }
@@ -182,3 +213,47 @@
 }
 .igLink:hover { color: var(--gold); }
 .trademark { font-size: .65rem; color: var(--muted); opacity: .5; }
+
+/* ── Landscape ── */
+@media (orientation: landscape) {
+  .page {
+    flex-direction: row;
+    align-items: stretch;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  /* Header compacto arriba del visor */
+  .header {
+    display: none;
+  }
+
+  /* Visor ocupa toda la altura disponible a la izquierda */
+  .viewfinderWrap {
+    flex: 0 0 auto;
+    width: auto;
+    height: 100dvh;
+    padding: 12px 8px 12px 12px;
+    display: flex;
+    align-items: center;
+  }
+  .viewfinder {
+    width: auto;
+    height: calc(100dvh - 24px);
+    aspect-ratio: 16 / 9;
+  }
+
+  /* Controles a la derecha, centrados verticalmente */
+  .controls {
+    flex: 1;
+    max-width: none;
+    padding: 16px 16px 16px 8px;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  /* Footer minimalista abajo de los controles */
+  .footer {
+    display: none;
+  }
+}
