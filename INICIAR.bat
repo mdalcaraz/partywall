@@ -27,29 +27,27 @@ if not exist "public\index.html" (
 )
 
 :: ── Tunnel Cloudflare ──────────────────────────────────────────────────
-where cloudflared >nul 2>&1
-if %ERRORLEVEL% EQU 0 (
+if exist "cloudflared.exe" (
   echo  Iniciando tunel Cloudflare...
-  start "CF Tunnel" /min cloudflared tunnel run fotobooth
-  timeout /t 4 /nobreak >nul
-  echo  Tunel activo.
+  start "CF Tunnel" /min cloudflared.exe tunnel --config CLOUDFLARE_CONFIG.yml run
+  timeout /t 5 /nobreak >nul
+  echo  Tunel activo - fotobooth.topdjgroup.com
 ) else (
-  echo  [AVISO] cloudflared no instalado - corriendo solo en LAN
+  echo  [AVISO] cloudflared.exe no encontrado - corriendo solo en LAN
 )
 
 echo.
 echo  Iniciando servidor...
 echo.
 
-:: ── Servidor en segundo plano ──────────────────────────────────────────
-set TUNNEL_URL=https://fotoevento.topdjgroup.com
+:: ── Servidor ──────────────────────────────────────────────────────────
 start "Fotobooth Server" /min cmd /c "node server.js & pause"
 
 :: Esperar que el servidor levante
 echo  Esperando servidor...
 :wait_loop
 timeout /t 1 /nobreak >nul
-curl -s http://localhost:3000/api/photos >nul 2>&1
+curl -s http://localhost:3000/fotobooth/api/qr >nul 2>&1
 if %ERRORLEVEL% NEQ 0 goto wait_loop
 
 echo  Servidor listo.
@@ -57,20 +55,16 @@ echo.
 
 :: ── Abrir browsers ────────────────────────────────────────────────────
 echo  Abriendo pantallas...
-
-:: Admin (ventana normal)
-start "" "http://localhost:3000/admin"
-
-:: Display (ventana separada — el operario la arrastra al proyector)
-start "" "http://localhost:3000/display"
+start "" "http://localhost:3000/fotobooth/admin"
+start "" "http://localhost:3000/fotobooth/display"
 
 echo.
 echo  ==========================================
 echo   TODO LISTO
 echo.
-echo   Admin:     http://localhost:3000/admin
-echo   Proyector: http://localhost:3000/display
-echo   Invitados: %TUNNEL_URL%/guest
+echo   Admin:     http://localhost:3000/fotobooth/admin
+echo   Proyector: http://localhost:3000/fotobooth/display
+echo   Invitados: https://fotobooth.topdjgroup.com/fotobooth/guest
 echo.
 echo   Arrastra la ventana del proyector
 echo   a la pantalla del proyector y
@@ -81,10 +75,10 @@ echo  Esta ventana se puede minimizar.
 echo  Para detener todo, cierra esta ventana.
 echo.
 
-:: Mantener viva esta ventana (si se cierra, el operario sabe que algo fallo)
+:: ── Watchdog ──────────────────────────────────────────────────────────
 :keepalive
 timeout /t 30 /nobreak >nul
-curl -s http://localhost:3000/api/photos >nul 2>&1
+curl -s http://localhost:3000/fotobooth/api/qr >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
   color 0C
   echo.
