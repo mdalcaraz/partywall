@@ -47,7 +47,7 @@ start "Fotobooth Server" /min cmd /c "node server.js & pause"
 echo  Esperando servidor...
 :wait_loop
 timeout /t 1 /nobreak >nul
-curl -s http://localhost:3000/fotobooth/api/qr >nul 2>&1
+curl -s http://localhost:3000/partywall/api/qr >nul 2>&1
 if %ERRORLEVEL% NEQ 0 goto wait_loop
 
 echo  Servidor listo.
@@ -55,16 +55,16 @@ echo.
 
 :: ── Abrir browsers ────────────────────────────────────────────────────
 echo  Abriendo pantallas...
-start "" "http://localhost:3000/fotobooth/admin"
-start "" "http://localhost:3000/fotobooth/display"
+start "" "http://localhost:3000/partywall/admin"
+start "" "http://localhost:3000/partywall/display"
 
 echo.
 echo  ==========================================
 echo   TODO LISTO
 echo.
-echo   Admin:     http://localhost:3000/fotobooth/admin
-echo   Proyector: http://localhost:3000/fotobooth/display
-echo   Invitados: https://fotobooth.topdjgroup.com/fotobooth/guest
+echo   Admin:     http://localhost:3000/partywall/admin
+echo   Proyector: http://localhost:3000/partywall/display
+echo   Invitados: https://partywall.topdjgroup.com/partywall/guest
 echo.
 echo   Arrastra la ventana del proyector
 echo   a la pantalla del proyector y
@@ -78,7 +78,7 @@ echo.
 :: ── Watchdog ──────────────────────────────────────────────────────────
 :keepalive
 timeout /t 30 /nobreak >nul
-curl -s http://localhost:3000/fotobooth/api/qr >nul 2>&1
+curl -s http://localhost:3000/partywall/api/qr >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
   color 0C
   echo.

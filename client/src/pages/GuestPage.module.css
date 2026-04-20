@@ -19,7 +19,7 @@
 }
 .logo {
   height: 36px;
-  filter: drop-shadow(0 0 10px rgba(200,160,66,.25));
+  filter: drop-shadow(0 0 10px rgba(0,232,144,.25));
 }
 .counter {
   background: var(--surface);
@@ -42,7 +42,7 @@
   padding: 16px 20px 0;
 }
 .viewfinder {
-  width: 100%;
+  width: min(80vw, 384px);
   aspect-ratio: 9 / 16;
   border-radius: var(--radius);
   overflow: hidden;
@@ -81,7 +81,7 @@
   font-family: 'Bebas Neue', sans-serif;
   font-size: 8rem;
   color: var(--gold);
-  text-shadow: 0 0 60px rgba(200,160,66,.6), 0 0 20px rgba(0,0,0,.8);
+  text-shadow: 0 0 60px rgba(0,232,144,.6), 0 0 20px rgba(0,0,0,.8);
 }
 
 .noCam {
@@ -123,7 +123,7 @@
 .shutter {
   width: 80px; height: 80px;
   border-radius: 50%;
-  border: 3px solid rgba(200,160,66,.35);
+  border: 3px solid rgba(0,232,144,.35);
   background: transparent;
   cursor: pointer;
   transition: transform .15s;
@@ -133,10 +133,10 @@
   width: 62px; height: 62px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--gold), var(--gold2));
-  box-shadow: 0 0 28px rgba(200,160,66,.45);
+  box-shadow: 0 0 28px rgba(0,232,144,.45);
   transition: all .15s;
 }
-.shutter:active .shutterInner { transform: scale(.88); box-shadow: 0 0 8px rgba(200,160,66,.2); }
+.shutter:active .shutterInner { transform: scale(.88); box-shadow: 0 0 8px rgba(0,232,144,.2); }
 .shutter:active { transform: scale(.95); }
 .shutter:disabled { opacity: .3; cursor: not-allowed; }
 
@@ -185,8 +185,8 @@
 .cooldown {
   font-size: .82rem; color: var(--gold);
   text-align: center; padding: 6px 14px;
-  border: 1px solid rgba(200,160,66,.3);
-  border-radius: 8px; background: rgba(200,160,66,.07);
+  border: 1px solid rgba(0,232,144,.3);
+  border-radius: 8px; background: rgba(0,232,144,.07);
 }
 .cooldown strong { font-weight: 700; }
 

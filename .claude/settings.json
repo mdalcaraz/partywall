@@ -25,7 +25,20 @@
       "Bash(awk '/\\\\/\\\\* latin \\\\*\\\\//{p=1} p && /src:/{print; p=0}')",
       "Bash(curl -s -o cormorant-italic-300-latin.woff2 \"https://fonts.gstatic.com/s/cormorantgaramond/v21/co3smX5slCNuHLi8bLeY9MK7whWMhyjYrGFEsdtdc62E6zd5rDD-iNM8.woff2\")",
       "Bash(curl -s -o cormorant-300-latin.woff2 \"https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtK.woff2\")",
-      "Bash(curl -s -o inter-latin.woff2 \"https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2\")"
+      "Bash(curl -s -o inter-latin.woff2 \"https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2\")",
+      "Bash(node -e \"require\\('crypto'\\); console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")",
+      "Bash(sshpass -p \"140962fotoboothServer09071994\" ssh -o StrictHostKeyChecking=no root@66.94.108.215 \"uname -a && lsb_release -a && node --version 2>/dev/null || echo 'node: not found' && nginx -v 2>&1 || echo 'nginx: not found' && pm2 --version 2>/dev/null || echo 'pm2: not found'\")",
+      "Bash(ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=yes root@66.94.108.215 \"uname -a\")",
+      "Bash(python3 -c \"import paramiko; print\\('ok'\\)\")",
+      "Bash(pip3 install *)",
+      "Read(//c/Program Files/PuTTY/**)",
+      "Read(//c/Windows/System32/OpenSSH/**)",
+      "Bash(node -e \"require\\('ssh2'\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(node setup-server.mjs)",
+      "Bash(node upload-app.mjs)",
+      "Bash(node -e *)",
+      "Read(//c/Users/MDalc/.ssh/**)"
     ]
   }
 }

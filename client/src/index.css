@@ -5,10 +5,10 @@
   --card:       #181818;
   --card-hover: #242424;
   --border:     #2a2a2a;
-  --gold:       #c8a042;
-  --gold2:      #e8bf5a;
-  --gold-dim:   rgba(200,160,66,.15);
-  --accent-hover: #00e890;
+  --gold:       #00e890;
+  --gold2:      #4dffc0;
+  --gold-dim:   rgba(0,232,144,.15);
+  --accent-hover: #4dffc0;
   --text:       #f5f2ec;
   --muted:      #6a6560;
   --green:      #2ecc71;
@@ -42,8 +42,8 @@ body {
 }
 
 @keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(200,160,66,.5); }
-  50%       { box-shadow: 0 0 0 5px rgba(200,160,66,0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,232,144,.5); }
+  50%       { box-shadow: 0 0 0 5px rgba(0,232,144,0); }
 }
 
 @keyframes fade-badge {

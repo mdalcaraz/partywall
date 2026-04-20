@@ -24,7 +24,7 @@
 .logo {
   width: 80px;
   margin-bottom: 8px;
-  filter: drop-shadow(0 0 16px rgba(200,160,66,.3));
+  filter: drop-shadow(0 0 16px rgba(0,232,144,.3));
 }
 
 .title {

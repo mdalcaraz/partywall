@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import socket from '../lib/socket'
+import { useParams } from 'react-router-dom'
+import { getSocket } from '../lib/socket'
 import s from './DisplayPage.module.css'
 
 function useImageCrossfade() {
@@ -25,6 +26,7 @@ function useImageCrossfade() {
 }
 
 export default function DisplayPage() {
+  const { eventId } = useParams()
   const { urlA, urlB, activeSlot, showImage, onLoad } = useImageCrossfade()
   const [hasPhoto, setHasPhoto]     = useState(false)
   const [ssActive, setSsActive]     = useState(false)
@@ -36,12 +38,15 @@ export default function DisplayPage() {
   const ssTimer    = useRef(null)
 
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}api/qr`)
+    fetch(`${import.meta.env.BASE_URL}api/e/${eventId}/qr`)
       .then((r) => r.json())
       .then((data) => setQrImg(data.qr))
-  }, [])
+  }, [eventId])
 
   useEffect(() => {
+    if (!eventId) return
+    const socket = getSocket(eventId)
+
     const onEstado    = ({ current }) => { if (current) { showImage(current.url); setHasPhoto(true) } }
     const onMostrar   = (photo) => { if (!photo) { showImage(null); setHasPhoto(false); return }; showImage(photo.url); setHasPhoto(true) }
     const onNueva     = () => showNotif('📸 Nueva foto recibida')
@@ -58,7 +63,7 @@ export default function DisplayPage() {
       socket.off('nueva_foto',       onNueva)
       socket.off('slideshow_estado', onSlideshow)
     }
-  }, []) // eslint-disable-line
+  }, [eventId]) // eslint-disable-line
 
   useEffect(() => {
     clearInterval(ssTimer.current)
@@ -116,7 +121,6 @@ export default function DisplayPage() {
         <span className={s.igHandle}>@topdjgroup</span>
       </div>
 
-      {/* QR permanente — abajo a la derecha */}
       {qrImg && (
         <div className={s.qrCorner}>
           <div className={s.qrLabel}>Escaneá para enviar tu foto</div>

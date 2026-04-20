@@ -1,28 +1,38 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import socket from '../lib/socket'
-import { authFetch } from '../lib/api'
+import { useNavigate, useParams } from 'react-router-dom'
+import { getSocket, disconnectSocket } from '../lib/socket'
+import { authFetch, decodeToken, clearToken } from '../lib/api'
 import s from './AdminPage.module.css'
 
 const INTERVALS = [3, 5, 10, 15]
 
 export default function AdminPage() {
+  const navigate          = useNavigate()
+  const { eventId: paramId } = useParams()
+  const payload           = decodeToken()
+  const eventId           = paramId ?? payload?.eventId
+
   const [photos, setPhotos]         = useState([])
   const [currentId, setCurrentId]   = useState(null)
   const [ssActive, setSsActive]     = useState(false)
   const [ssInterval, setSsInterval] = useState(3)
   const [qr, setQr]                 = useState(null)
-  const [connected, setConnected]   = useState(socket.connected)
+  const [connected, setConnected]   = useState(false)
   const [toast, setToast]           = useState({ msg: '', type: '', visible: false })
   const toastTimer = useRef(null)
-  const navigate   = useNavigate()
+  const socketRef  = useRef(null)
 
   const logout = () => {
-    sessionStorage.removeItem('auth_token')
+    disconnectSocket()
+    clearToken()
     navigate('/login', { replace: true })
   }
 
   useEffect(() => {
+    if (!eventId) return
+    const socket = getSocket(eventId)
+    socketRef.current = socket
+
     const onConnect    = () => setConnected(true)
     const onDisconnect = () => setConnected(false)
     const onEstado     = ({ current, photos: ph }) => { setPhotos(ph || []); setCurrentId(current?.id ?? null) }
@@ -32,6 +42,7 @@ export default function AdminPage() {
     const onSlideshow  = ({ active }) => setSsActive(active)
     const onActualizada = ({ id, inSlideshow }) => setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow } : p))
 
+    setConnected(socket.connected)
     socket.on('connect',          onConnect)
     socket.on('disconnect',       onDisconnect)
     socket.on('estado_inicial',   onEstado)
@@ -51,23 +62,22 @@ export default function AdminPage() {
       socket.off('slideshow_estado', onSlideshow)
       socket.off('foto_actualizada', onActualizada)
     }
-  }, [])
+  }, [eventId])
 
   useEffect(() => {
-    authFetch(`${import.meta.env.BASE_URL}api/photos`).then((r) => r.json()).then((ph) => setPhotos((prev) => (prev.length ? prev : ph)))
-    authFetch(`${import.meta.env.BASE_URL}api/qr`).then((r) => r.json()).then(setQr)
-  }, [])
+    if (!eventId) return
+    authFetch(`${import.meta.env.BASE_URL}api/e/${eventId}/photos`).then((r) => r.json()).then((ph) => setPhotos((prev) => (prev.length ? prev : ph)))
+    authFetch(`${import.meta.env.BASE_URL}api/e/${eventId}/qr`).then((r) => r.json()).then(setQr)
+  }, [eventId])
 
-  const project = (photo) => { socket.emit('proyectar', photo); showToast('Foto proyectada') }
-  const clearDisplay = () => { socket.emit('proyectar', null); setCurrentId(null); showToast('Pantalla apagada') }
-  const deletePhoto  = (id) => { if (!confirm('¿Eliminar esta foto?')) return; authFetch(`${import.meta.env.BASE_URL}api/photos/${id}`, { method: 'DELETE' }) }
+  const project = (photo) => { socketRef.current?.emit('proyectar', { eventId, photo }); showToast('Foto proyectada') }
+  const clearDisplay = () => { socketRef.current?.emit('proyectar', { eventId, photo: null }); setCurrentId(null); showToast('Pantalla apagada') }
+  const deletePhoto  = (id) => { if (!confirm('¿Eliminar esta foto?')) return; authFetch(`${import.meta.env.BASE_URL}api/e/${eventId}/photos/${id}`, { method: 'DELETE' }) }
   const toggleSlide  = (id) => {
-    // Optimistic update so the UI responds immediately
     setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow: !p.inSlideshow } : p))
-    authFetch(`${import.meta.env.BASE_URL}api/photos/${id}/slideshow`, { method: 'PATCH' })
+    authFetch(`${import.meta.env.BASE_URL}api/e/${eventId}/photos/${id}/slideshow`, { method: 'PATCH' })
       .then((r) => {
         if (!r.ok) {
-          // Revert on failure
           setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow: !p.inSlideshow } : p))
           showToast('Error al actualizar', '')
         }
@@ -75,13 +85,13 @@ export default function AdminPage() {
   }
   const clearAll     = () => {
     if (!confirm(`¿Eliminar las ${photos.length} fotos?`)) return
-    Promise.all(photos.map((p) => authFetch(`${import.meta.env.BASE_URL}api/photos/${p.id}`, { method: 'DELETE' }))).then(() => showToast('Fotos eliminadas'))
+    Promise.all(photos.map((p) => authFetch(`${import.meta.env.BASE_URL}api/e/${eventId}/photos/${p.id}`, { method: 'DELETE' }))).then(() => showToast('Fotos eliminadas'))
   }
   const toggleSlideshow = () => {
-    if (ssActive) socket.emit('slideshow_stop')
-    else socket.emit('slideshow_start', { interval: ssInterval * 1000 })
+    if (ssActive) socketRef.current?.emit('slideshow_stop', { eventId })
+    else socketRef.current?.emit('slideshow_start', { eventId, interval: ssInterval * 1000 })
   }
-  const changeInterval = (val) => { setSsInterval(val); if (ssActive) socket.emit('slideshow_start', { interval: val * 1000 }) }
+  const changeInterval = (val) => { setSsInterval(val); if (ssActive) socketRef.current?.emit('slideshow_start', { eventId, interval: val * 1000 }) }
   const showToast = (msg, type = '') => {
     clearTimeout(toastTimer.current)
     setToast({ msg, type, visible: true })

@@ -20,7 +20,7 @@
 .logo {
   width: 120px;
   opacity: .92;
-  filter: drop-shadow(0 0 24px rgba(200,160,66,.3));
+  filter: drop-shadow(0 0 24px rgba(0,232,144,.3));
 }
 .tagline {
   font-family: 'Bebas Neue', sans-serif;

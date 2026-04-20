@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { setToken } from '../lib/api'
 import s from './LoginPage.module.css'
 
 export default function LoginPage() {
@@ -23,8 +24,9 @@ export default function LoginPage() {
       const data = await res.json()
 
       if (data.success) {
-        sessionStorage.setItem('auth_token', data.token)
-        navigate('/admin', { replace: true })
+        setToken(data.token)
+        const { role } = JSON.parse(atob(data.token.split('.')[1]))
+        navigate(role === 'superadmin' ? '/superadmin' : '/admin', { replace: true })
       } else {
         setError(data.error || 'Credenciales incorrectas')
       }

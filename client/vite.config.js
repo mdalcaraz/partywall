@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const BASE = '/fotobooth'
+const BASE = '/partywall'
 
 export default defineConfig({
   base: `${BASE}/`,

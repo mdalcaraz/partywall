@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useParams } from 'react-router-dom'
 import s from './GuestPage.module.css'
 
 const TIMER_OPTIONS = [0, 3, 5]
@@ -26,6 +27,7 @@ function launchConfetti() {
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
 export default function GuestPage() {
+  const { eventId } = useParams()
   const videoRef  = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
@@ -134,7 +136,7 @@ export default function GuestPage() {
     const fd = new FormData()
     fd.append('photo', capturedBlob, `foto_${Date.now()}.jpg`)
     try {
-      const res  = await fetch(`${import.meta.env.BASE_URL}api/upload`, { method: 'POST', body: fd })
+      const res  = await fetch(`${import.meta.env.BASE_URL}api/e/${eventId}/upload`, { method: 'POST', body: fd })
       const data = await res.json()
       if (res.status === 429) {
         const secs = data.retryAfter || 60

@@ -1,18 +1,25 @@
-// Fetch autenticado — incluye el token en el header
-// Si el servidor devuelve 401, limpia la sesión y redirige al login
+const TOKEN_KEY = 'auth_token';
+
+export const getToken    = ()  => localStorage.getItem(TOKEN_KEY);
+export const setToken    = (t) => localStorage.setItem(TOKEN_KEY, t);
+export const clearToken  = ()  => localStorage.removeItem(TOKEN_KEY);
+
+export function decodeToken(token = getToken()) {
+  if (!token) return null;
+  try { return JSON.parse(atob(token.split('.')[1])); }
+  catch { return null; }
+}
+
 export function authFetch(url, options = {}) {
-  const token = sessionStorage.getItem('auth_token')
+  const token = getToken();
   return fetch(url, {
     ...options,
-    headers: {
-      ...options.headers,
-      'x-auth-token': token || '',
-    },
+    headers: { ...options.headers, 'x-auth-token': token || '' },
   }).then((res) => {
     if (res.status === 401) {
-      sessionStorage.removeItem('auth_token')
-      window.location.href = '/fotobooth/login'
+      clearToken();
+      window.location.href = '/partywall/login';
     }
-    return res
-  })
+    return res;
+  });
 }

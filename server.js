@@ -7,6 +7,10 @@ const path    = require('path');
 const fs      = require('fs');
 const QRCode  = require('qrcode');
 const os      = require('os');
+const crypto  = require('crypto');
+const bcrypt  = require('bcryptjs');
+const jwt     = require('jsonwebtoken');
+const { q }   = require('./db');
 
 // ── Config ────────────────────────────────────────────────────────────────
 function getLocalIP() {
@@ -18,33 +22,97 @@ function getLocalIP() {
 }
 
 const LOCAL_IP   = getLocalIP();
-const PORT       = 3000;
-const BASE       = '/fotobooth';
+const PORT       = parseInt(process.env.PORT) || 3000;
+const BASE       = '/partywall';
 const TUNNEL_URL = process.env.TUNNEL_URL || null;
+const JWT_SECRET = process.env.JWT_SECRET  || crypto.randomBytes(32).toString('hex');
+const SA_USER    = process.env.SUPER_ADMIN_USER || 'superadmin';
+const SA_PASS    = process.env.SUPER_ADMIN_PASS || 'changeme';
 
 // ── Auth ──────────────────────────────────────────────────────────────────
-const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-const ADMIN_PASS = process.env.ADMIN_PASS || 'topdjgroup';
-// Token generado al arrancar — cambia con cada reinicio
-const SESSION_TOKEN = require('crypto').randomBytes(32).toString('hex');
-
-function requireAuth(req, res, next) {
+function signToken(payload) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+}
+function verifyToken(req) {
   const token = req.headers['x-auth-token'];
-  if (token === SESSION_TOKEN) return next();
-  res.status(401).json({ error: 'No autorizado' });
+  if (!token) return null;
+  try { return jwt.verify(token, JWT_SECRET); } catch { return null; }
+}
+function requireSuperAdmin(req, res, next) {
+  const p = verifyToken(req);
+  if (!p || p.role !== 'superadmin') return res.status(401).json({ error: 'No autorizado' });
+  req.user = p; next();
+}
+function requireOperario(req, res, next) {
+  const p = verifyToken(req);
+  if (!p || p.role !== 'operario') return res.status(401).json({ error: 'No autorizado' });
+  if (req.params.eventId && req.params.eventId !== p.eventId)
+    return res.status(403).json({ error: 'Acceso denegado' });
+  req.user = p; next();
+}
+function requireAnyAdmin(req, res, next) {
+  const p = verifyToken(req);
+  if (!p) return res.status(401).json({ error: 'No autorizado' });
+  if (p.role === 'operario' && req.params.eventId && req.params.eventId !== p.eventId)
+    return res.status(403).json({ error: 'Acceso denegado' });
+  req.user = p; next();
 }
 
-// ── Asegurar carpeta uploads ──────────────────────────────────────────────
-if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+// ── Slideshow state (in-memory timers, per event) ─────────────────────────
+const slideshowTimers = new Map(); // eventId → { timer, interval, active }
+
+function getSsState(eventId) {
+  if (!slideshowTimers.has(eventId))
+    slideshowTimers.set(eventId, { timer: null, interval: 5000, active: false });
+  return slideshowTimers.get(eventId);
+}
+
+function startSlideshow(eventId) {
+  stopSlideshow(eventId);
+  const ss = getSsState(eventId);
+  const eligible = q.getSlideshowPhotos.all(eventId);
+  if (!eligible.length) return;
+  let idx = -1;
+  ss.active = true;
+  ss.timer = setInterval(() => {
+    const current = q.getSlideshowPhotos.all(eventId);
+    if (!current.length) return;
+    idx = (idx + 1) % current.length;
+    const photo = current[idx];
+    io.to(`event:${eventId}`).emit('mostrar_foto', normalize(photo));
+  }, ss.interval);
+}
+
+function stopSlideshow(eventId) {
+  const ss = getSsState(eventId);
+  if (ss.timer) { clearInterval(ss.timer); ss.timer = null; }
+  ss.active = false;
+}
+
+function normalize(photo) {
+  if (!photo) return null;
+  return { ...photo, inSlideshow: photo.in_slideshow === 1 };
+}
 
 // ── Express + Socket.io ───────────────────────────────────────────────────
+if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server);
 
+app.use(BASE, express.static('public'));
+app.use(`${BASE}/uploads`, express.static('uploads'));
+app.use(express.json());
+app.get('/', (req, res) => res.redirect(301, `${BASE}/`));
+
 // ── Multer ────────────────────────────────────────────────────────────────
 const storage = multer.diskStorage({
-  destination: 'uploads/',
+  destination: (req, file, cb) => {
+    const dir = `uploads/${req.params.eventId}`;
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || '.jpg';
     cb(null, `foto_${Date.now()}${ext}`);
@@ -59,178 +127,235 @@ const upload = multer({
   }
 });
 
-// ── Estado en memoria ─────────────────────────────────────────────────────
-let photos         = [];
-let currentDisplay = null;
-let slideshow      = { active: false, interval: 5000, timer: null };
+// ── Rate limiting ─────────────────────────────────────────────────────────
+const uploadLimits = new Map();
+const RL_MAX = 3, RL_WINDOW = 60 * 1000;
 
-// Las URLs de las fotos incluyen el base path para que el cliente las cargue bien
-try {
-  const files = fs.readdirSync('uploads').filter(f => /\.(jpg|jpeg|png|webp|gif)$/i.test(f));
-  photos = files.map(f => ({
-    id:          path.basename(f, path.extname(f)),
-    filename:    f,
-    url:         `${BASE}/uploads/${f}`,
-    timestamp:   fs.statSync(`uploads/${f}`).mtime.toISOString(),
-    inSlideshow: true
-  })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  console.log(`📷 ${photos.length} foto(s) preexistente(s) cargadas`);
-} catch (e) {}
-
-// ── Estáticos bajo /fotobooth ─────────────────────────────────────────────
-app.use(BASE, express.static('public'));
-app.use(`${BASE}/uploads`, express.static('uploads'));
-app.use(express.json());
-
-// Redirigir raíz → /fotobooth
-app.get('/', (req, res) => res.redirect(301, `${BASE}/`));
+function checkUploadLimit(req) {
+  const ip  = req.headers['cf-connecting-ip'] || req.ip;
+  const key = `${req.params.eventId}:${ip}`;
+  const now = Date.now();
+  const entry = uploadLimits.get(key) || { timestamps: [] };
+  entry.timestamps = entry.timestamps.filter(t => now - t < RL_WINDOW);
+  if (entry.timestamps.length >= RL_MAX) {
+    const retryAfter = Math.ceil((entry.timestamps[0] + RL_WINDOW - now) / 1000);
+    uploadLimits.set(key, entry);
+    return { allowed: false, retryAfter };
+  }
+  entry.timestamps.push(now);
+  uploadLimits.set(key, entry);
+  return { allowed: true };
+}
 
 // ── API: Login ────────────────────────────────────────────────────────────
 app.post(`${BASE}/api/login`, (req, res) => {
   const { username, password } = req.body;
-  if (username === ADMIN_USER && password === ADMIN_PASS) {
-    res.json({ success: true, token: SESSION_TOKEN });
-  } else {
-    res.status(401).json({ success: false, error: 'Usuario o contraseña incorrectos' });
+
+  if (username === SA_USER && password === SA_PASS) {
+    return res.json({
+      success: true,
+      token: signToken({ role: 'superadmin', sub: username }),
+      role: 'superadmin'
+    });
+  }
+
+  const event = q.getEventByUser.get(username);
+  if (event && bcrypt.compareSync(password, event.op_pass)) {
+    return res.json({
+      success: true,
+      token: signToken({ role: 'operario', sub: username, eventId: event.id, eventName: event.name }),
+      role: 'operario',
+      eventId: event.id
+    });
+  }
+
+  res.status(401).json({ success: false, error: 'Usuario o contraseña incorrectos' });
+});
+
+// ── API: SuperAdmin — Events ──────────────────────────────────────────────
+app.get(`${BASE}/api/events`, requireSuperAdmin, (req, res) => {
+  res.json(q.listEvents.all());
+});
+
+app.post(`${BASE}/api/events`, requireSuperAdmin, (req, res) => {
+  const { name, date, opUser, opPass } = req.body;
+  if (!name || !opUser || !opPass)
+    return res.status(400).json({ error: 'Faltan campos: name, opUser, opPass' });
+
+  const id         = crypto.randomBytes(6).toString('hex');
+  const hashedPass = bcrypt.hashSync(opPass, 10);
+
+  try {
+    q.createEvent.run(id, name, date || null, opUser, hashedPass);
+    res.json({ success: true, event: q.getEventById.get(id) });
+  } catch (e) {
+    if (e.message.includes('UNIQUE'))
+      return res.status(409).json({ error: 'El usuario ya existe' });
+    res.status(500).json({ error: 'Error al crear evento' });
   }
 });
 
-// ── Rate limit uploads ────────────────────────────────────────────────────
-const uploadLimits = new Map();
-const RL_MAX    = 3;
-const RL_WINDOW = 60 * 1000;
-
-function checkUploadLimit(req) {
-  const ip  = req.headers['cf-connecting-ip'] || req.ip;
-  const now = Date.now();
-  const entry = uploadLimits.get(ip) || { timestamps: [] };
-  entry.timestamps = entry.timestamps.filter(t => now - t < RL_WINDOW);
-  if (entry.timestamps.length >= RL_MAX) {
-    const retryAfter = Math.ceil((entry.timestamps[0] + RL_WINDOW - now) / 1000);
-    uploadLimits.set(ip, entry);
-    return { allowed: false, retryAfter };
+app.patch(`${BASE}/api/events/:id`, requireSuperAdmin, (req, res) => {
+  const { name, date, opUser, opPass } = req.body;
+  const hashedPass = opPass ? bcrypt.hashSync(opPass, 10) : null;
+  try {
+    q.updateEvent.run(name || null, date || null, opUser || null, hashedPass, req.params.id);
+    res.json({ success: true, event: q.getEventById.get(req.params.id) });
+  } catch (e) {
+    if (e.message.includes('UNIQUE'))
+      return res.status(409).json({ error: 'El usuario ya existe' });
+    res.status(500).json({ error: 'Error al actualizar' });
   }
-  entry.timestamps.push(now);
-  uploadLimits.set(ip, entry);
-  return { allowed: true };
-}
+});
 
-// ── API ───────────────────────────────────────────────────────────────────
-app.post(`${BASE}/api/upload`, upload.single('photo'), (req, res) => {
+app.patch(`${BASE}/api/events/:id/active`, requireSuperAdmin, (req, res) => {
+  q.setEventActive.run(req.body.active ? 1 : 0, req.params.id);
+  res.json({ success: true });
+});
+
+app.delete(`${BASE}/api/events/:id`, requireSuperAdmin, (req, res) => {
+  const event = q.getEventById.get(req.params.id);
+  if (!event) return res.status(404).json({ error: 'No encontrado' });
+
+  try { fs.rmSync(`uploads/${req.params.id}`, { recursive: true, force: true }); } catch {}
+  q.deleteEvent.run(req.params.id);
+  res.json({ success: true });
+});
+
+// ── API: Event (operario + superadmin) ───────────────────────────────────
+app.get(`${BASE}/api/e/:eventId/photos`, requireAnyAdmin, (req, res) => {
+  res.json(q.getPhotos.all(req.params.eventId).map(normalize));
+});
+
+app.get(`${BASE}/api/e/:eventId/qr`, (req, res) => {
+  const event = q.getEventById.get(req.params.eventId);
+  if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
+  const base = TUNNEL_URL || `http://${LOCAL_IP}:${PORT}`;
+  const url  = `${base}${BASE}/e/${req.params.eventId}/guest`;
+  QRCode.toDataURL(url, { width: 300, margin: 2, color: { dark: '#000', light: '#fff' } })
+    .then(qr => res.json({ url, qr }));
+});
+
+app.patch(`${BASE}/api/e/:eventId/photos/:photoId/slideshow`, requireAnyAdmin, (req, res) => {
+  const photo = q.getPhoto.get(req.params.photoId, req.params.eventId);
+  if (!photo) return res.status(404).json({ error: 'No encontrada' });
+  q.toggleSlideshow.run(req.params.photoId, req.params.eventId);
+  const updated = q.getPhoto.get(req.params.photoId, req.params.eventId);
+  io.to(`event:${req.params.eventId}`).emit('foto_actualizada', {
+    id: updated.id, inSlideshow: updated.in_slideshow === 1
+  });
+  res.json({ success: true, inSlideshow: updated.in_slideshow === 1 });
+});
+
+app.delete(`${BASE}/api/e/:eventId/photos/:photoId`, requireAnyAdmin, (req, res) => {
+  const photo = q.getPhoto.get(req.params.photoId, req.params.eventId);
+  if (!photo) return res.status(404).json({ error: 'No encontrada' });
+  try { fs.unlinkSync(`uploads/${req.params.eventId}/${photo.filename}`); } catch {}
+  q.deletePhoto.run(req.params.photoId, req.params.eventId);
+  io.to(`event:${req.params.eventId}`).emit('foto_eliminada', { id: req.params.photoId });
+  res.json({ success: true });
+});
+
+// ── API: Upload (public, rate-limited) ────────────────────────────────────
+app.post(`${BASE}/api/e/:eventId/upload`, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Sin archivo' });
+
+  const event = q.getEventById.get(req.params.eventId);
+  if (!event || !event.active) {
+    try { fs.unlinkSync(req.file.path); } catch {}
+    return res.status(404).json({ error: 'Evento no encontrado o inactivo' });
+  }
 
   const limit = checkUploadLimit(req);
   if (!limit.allowed) {
-    fs.unlinkSync(req.file.path);
+    try { fs.unlinkSync(req.file.path); } catch {}
     return res.status(429).json({ error: 'Límite alcanzado', retryAfter: limit.retryAfter });
   }
 
-  const photo = {
-    id:          path.basename(req.file.filename, path.extname(req.file.filename)),
-    filename:    req.file.filename,
-    url:         `${BASE}/uploads/${req.file.filename}`,
-    timestamp:   new Date().toISOString(),
-    inSlideshow: true
-  };
+  const id        = path.basename(req.file.filename, path.extname(req.file.filename));
+  const url       = `${BASE}/uploads/${req.params.eventId}/${req.file.filename}`;
+  const timestamp = new Date().toISOString();
 
-  photos.unshift(photo);
-  io.emit('nueva_foto', photo);
-  console.log(`📸 Nueva foto: ${photo.filename}`);
+  q.addPhoto.run(id, req.params.eventId, req.file.filename, url, timestamp);
+  const photo = normalize(q.getPhoto.get(id, req.params.eventId));
+
+  io.to(`event:${req.params.eventId}`).emit('nueva_foto', photo);
+  console.log(`📸 [${req.params.eventId}] ${req.file.filename}`);
   res.json({ success: true, photo });
-});
-
-app.get(`${BASE}/api/photos`,  requireAuth, (req, res) => res.json(photos));
-app.get(`${BASE}/api/display`, requireAuth, (req, res) => res.json({ current: currentDisplay, slideshow }));
-
-app.get(`${BASE}/api/qr`, async (req, res) => {
-  const base = TUNNEL_URL || `http://${LOCAL_IP}:${PORT}`;
-  const url  = `${base}${BASE}/guest`;
-  const qr   = await QRCode.toDataURL(url, { width: 300, margin: 2, color: { dark: '#000', light: '#fff' } });
-  res.json({ url, qr });
-});
-
-app.patch(`${BASE}/api/photos/:id/slideshow`, requireAuth, (req, res) => {
-  const { id } = req.params;
-  const photo = photos.find(p => p.id === id);
-  if (!photo) return res.status(404).json({ error: 'No encontrada' });
-  photo.inSlideshow = !photo.inSlideshow;
-  io.emit('foto_actualizada', { id: photo.id, inSlideshow: photo.inSlideshow });
-  res.json({ success: true, inSlideshow: photo.inSlideshow });
-});
-
-app.delete(`${BASE}/api/photos/:id`, requireAuth, (req, res) => {
-  const { id } = req.params;
-  const idx = photos.findIndex(p => p.id === id);
-  if (idx === -1) return res.status(404).json({ error: 'No encontrada' });
-
-  const photo = photos[idx];
-  try { fs.unlinkSync(`uploads/${photo.filename}`); } catch (e) {}
-  photos.splice(idx, 1);
-  io.emit('foto_eliminada', { id });
-  res.json({ success: true });
 });
 
 // ── Socket.io ─────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
-  console.log(`🔌 Conectado: ${socket.id}`);
-  socket.emit('estado_inicial', { current: currentDisplay, photos: photos.slice(0, 50) });
+  console.log(`🔌 ${socket.id}`);
 
-  socket.on('proyectar', (data) => {
-    currentDisplay = data;
-    stopSlideshow();
-    io.emit('mostrar_foto', data);
+  socket.on('join_event', ({ eventId, token }) => {
+    if (!eventId) return;
+
+    // Verify role if token provided
+    if (token) {
+      try {
+        const p = jwt.verify(token, JWT_SECRET);
+        socket.data.role    = p.role;
+        socket.data.eventId = p.eventId || eventId;
+      } catch { /* viewer */ }
+    }
+
+    socket.join(`event:${eventId}`);
+    socket.data.currentEventId = eventId;
+
+    const photos    = q.getPhotos.all(eventId).slice(0, 50).map(normalize);
+    const ss        = getSsState(eventId);
+
+    socket.emit('estado_inicial', {
+      current:   null,
+      photos,
+      slideshow: { active: ss.active, interval: ss.interval }
+    });
+    console.log(`📌 ${socket.id} → event:${eventId}`);
   });
 
-  socket.on('slideshow_start', ({ interval }) => {
-    slideshow.interval = interval || 5000;
-    slideshow.active = true;
-    startSlideshow();
-    io.emit('slideshow_estado', { active: true, interval: slideshow.interval });
+  socket.on('proyectar', ({ eventId, photo }) => {
+    if (!canControl(socket, eventId)) return;
+    stopSlideshow(eventId);
+    io.to(`event:${eventId}`).emit('mostrar_foto', photo);
   });
 
-  socket.on('slideshow_stop', () => {
-    stopSlideshow();
-    io.emit('slideshow_estado', { active: false });
+  socket.on('slideshow_start', ({ eventId, interval }) => {
+    if (!canControl(socket, eventId)) return;
+    const ss = getSsState(eventId);
+    ss.interval = interval || 5000;
+    startSlideshow(eventId);
+    io.to(`event:${eventId}`).emit('slideshow_estado', { active: true, interval: ss.interval });
   });
 
-  socket.on('disconnect', () => console.log(`❌ Desconectado: ${socket.id}`));
+  socket.on('slideshow_stop', ({ eventId }) => {
+    if (!canControl(socket, eventId)) return;
+    stopSlideshow(eventId);
+    io.to(`event:${eventId}`).emit('slideshow_estado', { active: false });
+  });
+
+  socket.on('disconnect', () => console.log(`❌ ${socket.id}`));
 });
 
-// ── Slideshow ─────────────────────────────────────────────────────────────
-function startSlideshow() {
-  stopSlideshow();
-  const eligible = photos.filter(p => p.inSlideshow);
-  if (eligible.length === 0) return;
-  let idx = currentDisplay ? eligible.findIndex(p => p.id === currentDisplay.id) : -1;
-  slideshow.timer = setInterval(() => {
-    const current = photos.filter(p => p.inSlideshow);
-    if (current.length === 0) return;
-    idx = (idx + 1) % current.length;
-    currentDisplay = current[idx];
-    io.emit('mostrar_foto', currentDisplay);
-  }, slideshow.interval);
+function canControl(socket, eventId) {
+  const role = socket.data.role;
+  if (role === 'superadmin') return true;
+  if (role === 'operario' && socket.data.eventId === eventId) return true;
+  return false;
 }
 
-function stopSlideshow() {
-  if (slideshow.timer) { clearInterval(slideshow.timer); slideshow.timer = null; }
-  slideshow.active = false;
-}
-
-// ── SPA fallback — cualquier ruta bajo /fotobooth sirve el index.html ─────
+// ── SPA fallback ──────────────────────────────────────────────────────────
 app.get(`${BASE}/*`, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ── Arrancar ──────────────────────────────────────────────────────────────
 server.listen(PORT, '0.0.0.0', () => {
-  const pub  = TUNNEL_URL || `http://${LOCAL_IP}:${PORT}`;
-  const lan  = `http://${LOCAL_IP}:${PORT}`;
-
+  const lan = `http://${LOCAL_IP}:${PORT}`;
   console.log('\n╔══════════════════════════════════════════════════════╗');
-  console.log('║              🎉 FOTOBOOTH ACTIVO                     ║');
+  console.log('║           🎉 FOTOBOOTH SaaS ACTIVO                   ║');
   console.log('╠══════════════════════════════════════════════════════╣');
-  console.log(`║  📱 Invitados:  ${pub}${BASE}/guest`);
-  console.log(`║  🎛️  Admin:     ${lan}${BASE}/admin`);
-  console.log(`║  📽️  Proyector: ${lan}${BASE}/display`);
+  console.log(`║  👑 Super Admin: ${lan}${BASE}/superadmin`);
+  console.log(`║  🔑 Login:       ${lan}${BASE}/login`);
   console.log('╚══════════════════════════════════════════════════════╝\n');
 });

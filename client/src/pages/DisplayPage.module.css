@@ -45,14 +45,14 @@
 
 .idleLogo {
   width: clamp(160px, 30vw, 280px);
-  filter: drop-shadow(0 0 40px rgba(200,160,66,.3));
+  filter: drop-shadow(0 0 40px rgba(0,232,144,.3));
   animation: gold-pulse 3s ease infinite;
 }
 .idleSub {
   font-family: var(--font-body);
   font-size: clamp(.7rem, 1.5vw, 1rem);
   font-weight: 300;
-  color: rgba(200,160,66,.4);
+  color: rgba(0,232,144,.4);
   letter-spacing: .35em;
   text-transform: uppercase;
 }
@@ -61,7 +61,7 @@
 .particles { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
 .particle {
   position: absolute; border-radius: 50%;
-  background: rgba(200,160,66,.12);
+  background: rgba(0,232,144,.12);
   animation: drift linear infinite;
 }
 
@@ -77,14 +77,14 @@
 .infoShow { opacity: 1; }
 .brandLogo {
   height: 36px;
-  filter: drop-shadow(0 0 12px rgba(200,160,66,.4));
+  filter: drop-shadow(0 0 12px rgba(0,232,144,.4));
   opacity: .85;
 }
 .igHandle {
   font-family: var(--font-body);
   font-size: .78rem;
   font-weight: 300;
-  color: rgba(200,160,66,.5);
+  color: rgba(0,232,144,.5);
   letter-spacing: .18em;
   text-transform: uppercase;
 }
@@ -101,7 +101,7 @@
   z-index: 4;
   background: rgba(8,8,8,.7);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(200,160,66,.25);
+  border: 1px solid rgba(0,232,144,.25);
   border-radius: 14px;
   padding: 10px 10px 8px;
 }
@@ -109,7 +109,7 @@
   font-family: var(--font-body);
   font-size: clamp(.5rem, .9vw, .68rem);
   font-weight: 500;
-  color: rgba(200,160,66,.85);
+  color: rgba(0,232,144,.85);
   letter-spacing: .18em;
   text-transform: uppercase;
   text-align: center;
@@ -136,9 +136,9 @@
   position: fixed; top: 24px; right: 24px;
   background: rgba(8,8,8,.85);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(200,160,66,.2);
+  border: 1px solid rgba(0,232,144,.2);
   border-radius: 12px; padding: 10px 16px;
-  color: rgba(200,160,66,.8);
+  color: rgba(0,232,144,.8);
   font-family: 'DM Sans', sans-serif; font-size: .82rem;
   transform: translateX(120%);
   transition: transform .4s cubic-bezier(.34,1.56,.64,1);
