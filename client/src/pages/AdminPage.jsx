@@ -25,10 +25,9 @@ export default function AdminPage() {
   const socketRef  = useRef(null)
 
   // Music state
-  const [musicEnabled, setMusicEnabled]     = useState(false)
-  const [musicRequests, setMusicRequests]   = useState([])
-  const [musicQr, setMusicQr]               = useState(null)
-  const [musicFilter, setMusicFilter]       = useState('pending') // 'pending'|'all'
+  const [musicEnabled, setMusicEnabled]   = useState(false)
+  const [musicRequests, setMusicRequests] = useState([])
+  const [musicQr, setMusicQr]             = useState(null)
 
   const logout = () => {
     disconnectSocket()
@@ -134,34 +133,12 @@ export default function AdminPage() {
   const changeInterval = (val) => { setSsInterval(val); if (ssActive) socketRef.current?.emit('slideshow_start', { eventId, interval: val * 1000 }) }
 
   // ── Music actions ─────────────────────────────────────────────────────────
-  const setPlaying = async (id) => {
-    await authFetch(`${BASE}api/e/${eventId}/music/requests/${id}`, {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ status: 'playing' }),
-    })
-    showToast('Poniendo ahora')
-  }
-  const setDone = async (id) => {
-    await authFetch(`${BASE}api/e/${eventId}/music/requests/${id}`, {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ status: 'done' }),
-    })
-    showToast('Marcado como tocado')
-  }
   const deleteRequest = async (id) => {
     if (!confirm('¿Eliminar este pedido?')) return
     await authFetch(`${BASE}api/e/${eventId}/music/requests/${id}`, { method: 'DELETE' })
   }
 
-  const currentPhoto   = photos.find((p) => p.id === currentId) ?? null
-  const pendingCount   = musicRequests.filter(r => r.status === 'pending').length
-  const playingRequest = musicRequests.find(r => r.status === 'playing')
-
-  const visibleRequests = musicFilter === 'pending'
-    ? musicRequests.filter(r => r.status !== 'done')
-    : musicRequests
+  const currentPhoto = photos.find((p) => p.id === currentId) ?? null
 
   return (
     <div className={s.page}>
@@ -262,41 +239,20 @@ export default function AdminPage() {
             <div className={s.panelMusic}>
               <div className={s.panelHeader}>
                 <div className={s.panelTitle}>
-                  🎵 Cola
-                  {pendingCount > 0 && <span className={s.pendingBadge}>{pendingCount}</span>}
-                </div>
-                <div className={s.musicFilters}>
-                  <button className={`${s.filterBtn} ${musicFilter === 'pending' ? s.filterActive : ''}`} onClick={() => setMusicFilter('pending')}>Activos</button>
-                  <button className={`${s.filterBtn} ${musicFilter === 'all' ? s.filterActive : ''}`} onClick={() => setMusicFilter('all')}>Todos</button>
+                  🎵 Pedidos
+                  {musicRequests.length > 0 && <span className={s.pendingBadge}>{musicRequests.length}</span>}
                 </div>
               </div>
 
-              {/* Now playing */}
-              {playingRequest && (
-                <div className={s.musicPlaying}>
-                  {playingRequest.album_art && <img src={playingRequest.album_art} alt="" className={s.musicPlayingArt} />}
-                  <div className={s.musicPlayingInfo}>
-                    <div className={s.musicPlayingLabel}>Sonando ahora</div>
-                    <div className={s.musicPlayingName}>{playingRequest.track_name}</div>
-                    <div className={s.musicPlayingArtist}>{playingRequest.artist_name}</div>
-                  </div>
-                  <div className={s.musicPlayingActions}>
-                    <button className={`${s.musicBtn} ${s.musicBtnDone}`} onClick={() => setDone(playingRequest.id)}>✓ Tocado</button>
-                    <button className={`${s.musicBtn} ${s.musicBtnDel}`} onClick={() => deleteRequest(playingRequest.id)}>🗑</button>
-                  </div>
-                </div>
-              )}
-
-              {/* Queue list */}
-              {visibleRequests.length === 0 ? (
+              {musicRequests.length === 0 ? (
                 <div className={s.emptyState}>
                   <div className={s.emptyIcon}>🎵</div>
                   <p>Sin pedidos aún. Los invitados escanean el QR de música.</p>
                 </div>
               ) : (
                 <div className={s.musicList}>
-                  {visibleRequests.map((r) => (
-                    <div key={r.id} className={`${s.musicCard} ${r.status === 'playing' ? s.musicCardPlaying : ''} ${r.status === 'done' ? s.musicCardDone : ''}`}>
+                  {musicRequests.map((r) => (
+                    <div key={r.id} className={s.musicCard}>
                       {r.album_art
                         ? <img src={r.album_art} alt="" className={s.musicCardArt} />
                         : <div className={s.musicCardArtPlaceholder}>🎵</div>
@@ -306,17 +262,7 @@ export default function AdminPage() {
                         <div className={s.musicCardArtist}>{r.artist_name}</div>
                         {r.album_name && <div className={s.musicCardAlbum}>{r.album_name}</div>}
                       </div>
-                      <div className={s.musicCardStatus}>
-                        {r.status === 'done'    && <span className={s.statusDone}>✓ Tocado</span>}
-                        {r.status === 'playing' && <span className={s.statusPlaying}>▶ Sonando</span>}
-                      </div>
                       <div className={s.musicCardActions}>
-                        {r.status === 'pending' && (
-                          <button className={`${s.musicBtn} ${s.musicBtnPlay}`} onClick={() => setPlaying(r.id)} title="Poner ahora">▶</button>
-                        )}
-                        {r.status !== 'done' && (
-                          <button className={`${s.musicBtn} ${s.musicBtnDone}`} onClick={() => setDone(r.id)} title="Marcar tocado">✓</button>
-                        )}
                         <button className={`${s.musicBtn} ${s.musicBtnDel}`} onClick={() => deleteRequest(r.id)} title="Eliminar">🗑</button>
                       </div>
                     </div>
