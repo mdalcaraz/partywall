@@ -64,7 +64,9 @@
       "Bash(npx sequelize-cli *)",
       "Bash(git reset *)",
       "Bash(git fsck *)",
-      "Bash(git restore *)"
+      "Bash(git restore *)",
+      "Bash(git merge --no-ff feature/music-requests -m ' *)",
+      "Bash(git stash *)"
     ],
     "additionalDirectories": [
       "F:\\partywall",
