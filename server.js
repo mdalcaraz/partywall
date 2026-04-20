@@ -532,6 +532,16 @@ app.get(`${BASE}/api/e/:eventId/music/qr`, requireAnyAdmin, async (req, res) => 
   res.json({ url, qr });
 });
 
+// ── API: Music — QR público para pantalla de display ──────────────────────
+app.get(`${BASE}/api/e/:eventId/music/qr/public`, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event || !event.music_enabled) return res.json({ enabled: false });
+  const base = TUNNEL_URL || `http://${LOCAL_IP}:${PORT}`;
+  const url  = `${base}${BASE}/e/${req.params.eventId}/music`;
+  const qr   = await QRCode.toDataURL(url, { width: 300, margin: 2, color: { dark: '#000', light: '#fff' } });
+  res.json({ enabled: true, url, qr });
+});
+
 // ── Socket.io ─────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log(`🔌 ${socket.id}`);

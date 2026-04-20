@@ -13,8 +13,6 @@ export default function AdminPage() {
   const payload           = decodeToken()
   const eventId           = paramId ?? payload?.eventId
 
-  const [tab, setTab]               = useState('fotos') // 'fotos' | 'musica'
-
   // Photos state
   const [photos, setPhotos]         = useState([])
   const [currentId, setCurrentId]   = useState(null)
@@ -64,23 +62,23 @@ export default function AdminPage() {
     const onActualizada = ({ id, inSlideshow }) => setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow } : p))
 
     // Music socket events
-    const onMusicNueva      = (r)           => { setMusicRequests(prev => [...prev, r]); showToast(`🎵 ${r.artist_name} — ${r.track_name}`, 'green') }
-    const onMusicActualizada = ({ id, status }) => setMusicRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r))
-    const onMusicEliminada  = ({ id })      => setMusicRequests(prev => prev.filter(r => r.id !== id))
-    const onMusicCleared    = ()            => setMusicRequests(prev => prev.map(r => r.status === 'playing' ? { ...r, status: 'pending' } : r))
+    const onMusicNueva       = (r)               => { setMusicRequests(prev => [...prev, r]); showToast(`🎵 ${r.artist_name} — ${r.track_name}`, 'green') }
+    const onMusicActualizada = ({ id, status })  => setMusicRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r))
+    const onMusicEliminada   = ({ id })          => setMusicRequests(prev => prev.filter(r => r.id !== id))
+    const onMusicCleared     = ()                => setMusicRequests(prev => prev.map(r => r.status === 'playing' ? { ...r, status: 'pending' } : r))
 
     setConnected(socket.connected)
-    socket.on('connect',              onConnect)
-    socket.on('disconnect',           onDisconnect)
-    socket.on('estado_inicial',       onEstado)
-    socket.on('nueva_foto',           onNueva)
-    socket.on('foto_eliminada',       onEliminada)
-    socket.on('mostrar_foto',         onMostrar)
-    socket.on('slideshow_estado',     onSlideshow)
-    socket.on('foto_actualizada',     onActualizada)
-    socket.on('music_nueva',          onMusicNueva)
-    socket.on('music_actualizada',    onMusicActualizada)
-    socket.on('music_eliminada',      onMusicEliminada)
+    socket.on('connect',               onConnect)
+    socket.on('disconnect',            onDisconnect)
+    socket.on('estado_inicial',        onEstado)
+    socket.on('nueva_foto',            onNueva)
+    socket.on('foto_eliminada',        onEliminada)
+    socket.on('mostrar_foto',          onMostrar)
+    socket.on('slideshow_estado',      onSlideshow)
+    socket.on('foto_actualizada',      onActualizada)
+    socket.on('music_nueva',           onMusicNueva)
+    socket.on('music_actualizada',     onMusicActualizada)
+    socket.on('music_eliminada',       onMusicEliminada)
     socket.on('music_playing_cleared', onMusicCleared)
 
     return () => {
@@ -112,7 +110,7 @@ export default function AdminPage() {
   }, [eventId])
 
   // ── Photo actions ─────────────────────────────────────────────────────────
-  const project     = (photo) => { socketRef.current?.emit('proyectar', { eventId, photo }); showToast('Foto proyectada') }
+  const project      = (photo) => { socketRef.current?.emit('proyectar', { eventId, photo }); showToast('Foto proyectada') }
   const clearDisplay = () => { socketRef.current?.emit('proyectar', { eventId, photo: null }); setCurrentId(null); showToast('Pantalla apagada') }
   const deletePhoto  = (id) => { if (!confirm('¿Eliminar esta foto?')) return; authFetch(`${BASE}api/e/${eventId}/photos/${id}`, { method: 'DELETE' }) }
   const toggleSlide  = (id) => {
@@ -218,68 +216,55 @@ export default function AdminPage() {
           </div>
         </aside>
 
-        {/* ── Main ── */}
+        {/* ── Main split ── */}
         <main className={s.main}>
-          {/* Tab bar */}
-          <div className={s.tabBar}>
-            <button className={`${s.tab} ${tab === 'fotos' ? s.tabActive : ''}`} onClick={() => setTab('fotos')}>
-              📸 Fotos
-              <span className={s.tabBadge}>{photos.length}</span>
-            </button>
-            {musicEnabled && (
-              <button className={`${s.tab} ${tab === 'musica' ? s.tabActive : ''}`} onClick={() => setTab('musica')}>
-                🎵 Música
-                {pendingCount > 0 && <span className={`${s.tabBadge} ${s.tabBadgeGold}`}>{pendingCount}</span>}
-              </button>
-            )}
-          </div>
+          {/* ── Panel: Fotos ── */}
+          <div className={`${s.panelPhotos} ${musicEnabled ? '' : s.panelFull}`}>
+            <div className={s.panelHeader}>
+              <div className={s.panelTitle}>📸 Fotos</div>
+              <div className={s.photoCount}>{photos.length} foto{photos.length !== 1 ? 's' : ''}</div>
+              <button className={s.btnClearAll} onClick={clearAll}>🗑 Borrar todas</button>
+            </div>
 
-          {/* ── TAB: Fotos ── */}
-          {tab === 'fotos' && (
-            <>
-              <div className={s.mainHeader}>
-                <div className={s.mainTitle}>Fotos recibidas</div>
-                <div className={s.photoCount}>{photos.length} foto{photos.length !== 1 ? 's' : ''}</div>
-                <button className={s.btnClearAll} onClick={clearAll}>🗑 Borrar todas</button>
-              </div>
-
-              <div className={s.photoGrid}>
-                {photos.length === 0 ? (
-                  <div className={s.emptyState}>
-                    <div className={s.emptyIcon}>📭</div>
-                    <p>Aún no hay fotos. Los invitados escanean el QR para empezar.</p>
-                  </div>
-                ) : (
-                  photos.map((photo, i) => (
-                    <div key={photo.id} className={`${s.photoCard} ${photo.id === currentId ? s.photoCardActive : ''} ${!photo.inSlideshow ? s.photoCardExcluded : ''}`}>
-                      <img src={photo.url} loading="lazy" alt="foto" />
-                      {i === 0 && photo._new && <div className={s.newBadge}>NUEVA</div>}
-                      {photo.id === currentId && <div className={s.activeBadge}>✦ Activa</div>}
-                      <button
-                        className={`${s.btnSlide} ${photo.inSlideshow ? s.btnSlideOn : s.btnSlideOff}`}
-                        onClick={(e) => { e.stopPropagation(); toggleSlide(photo.id) }}
-                        title={photo.inSlideshow ? 'Quitar del slideshow' : 'Incluir en slideshow'}
-                      >
-                        {photo.inSlideshow ? '▶' : '⏸'}
-                      </button>
-                      <div className={s.photoOverlay}>
-                        <div className={s.overlayActions}>
-                          <button className={s.btnProject} onClick={() => project(photo)}>📽 Proyectar</button>
-                          <button className={s.btnDelete} onClick={() => deletePhoto(photo.id)} title="Eliminar">🗑</button>
-                        </div>
+            <div className={s.photoGrid}>
+              {photos.length === 0 ? (
+                <div className={s.emptyState}>
+                  <div className={s.emptyIcon}>📭</div>
+                  <p>Aún no hay fotos. Los invitados escanean el QR para empezar.</p>
+                </div>
+              ) : (
+                photos.map((photo, i) => (
+                  <div key={photo.id} className={`${s.photoCard} ${photo.id === currentId ? s.photoCardActive : ''} ${!photo.inSlideshow ? s.photoCardExcluded : ''}`}>
+                    <img src={photo.url} loading="lazy" alt="foto" />
+                    {i === 0 && photo._new && <div className={s.newBadge}>NUEVA</div>}
+                    {photo.id === currentId && <div className={s.activeBadge}>✦ Activa</div>}
+                    <button
+                      className={`${s.btnSlide} ${photo.inSlideshow ? s.btnSlideOn : s.btnSlideOff}`}
+                      onClick={(e) => { e.stopPropagation(); toggleSlide(photo.id) }}
+                      title={photo.inSlideshow ? 'Quitar del slideshow' : 'Incluir en slideshow'}
+                    >
+                      {photo.inSlideshow ? '▶' : '⏸'}
+                    </button>
+                    <div className={s.photoOverlay}>
+                      <div className={s.overlayActions}>
+                        <button className={s.btnProject} onClick={() => project(photo)}>📽 Proyectar</button>
+                        <button className={s.btnDelete} onClick={() => deletePhoto(photo.id)} title="Eliminar">🗑</button>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </>
-          )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
 
-          {/* ── TAB: Música ── */}
-          {tab === 'musica' && (
-            <div className={s.musicPanel}>
-              <div className={s.musicHeader}>
-                <div className={s.mainTitle}>Cola de pedidos</div>
+          {/* ── Panel: Música ── */}
+          {musicEnabled && (
+            <div className={s.panelMusic}>
+              <div className={s.panelHeader}>
+                <div className={s.panelTitle}>
+                  🎵 Cola
+                  {pendingCount > 0 && <span className={s.pendingBadge}>{pendingCount}</span>}
+                </div>
                 <div className={s.musicFilters}>
                   <button className={`${s.filterBtn} ${musicFilter === 'pending' ? s.filterActive : ''}`} onClick={() => setMusicFilter('pending')}>Activos</button>
                   <button className={`${s.filterBtn} ${musicFilter === 'all' ? s.filterActive : ''}`} onClick={() => setMusicFilter('all')}>Todos</button>

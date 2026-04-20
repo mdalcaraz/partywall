@@ -89,11 +89,11 @@
   text-transform: uppercase;
 }
 
-/* ── QR corner ── */
-.qrCorner {
+/* ── QR corners ── */
+.qrCorner,
+.qrCornerLeft {
   position: fixed;
   bottom: 28px;
-  right: 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -105,6 +105,8 @@
   border-radius: 14px;
   padding: 10px 10px 8px;
 }
+.qrCorner     { right: 28px; }
+.qrCornerLeft { left: 28px; }
 .qrLabel {
   font-family: var(--font-body);
   font-size: clamp(.5rem, .9vw, .68rem);
@@ -134,7 +136,8 @@
 /* ── Music overlay (now playing) ── */
 .musicOverlay {
   position: fixed;
-  bottom: 28px; left: 28px;
+  top: 28px; left: 50%;
+  transform: translateX(-50%) translateY(-20px) scale(.96);
   display: flex; align-items: center; gap: 12px;
   background: rgba(8,8,8,.82);
   backdrop-filter: blur(16px);
@@ -150,7 +153,7 @@
 }
 .musicOverlayShow {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateX(-50%) translateY(0) scale(1);
 }
 .musicOverlayArt {
   width: clamp(44px, 5vw, 60px);
