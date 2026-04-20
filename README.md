@@ -41,7 +41,9 @@ partywall/
 │           ├── api.js       # Auth + fetch helpers
 │           └── socket.js    # Socket.io client
 ├── public/                  # Build del frontend (generado)
-├── uploads/                 # Fotos subidas (por eventId)
+├── storage/                 # Archivos por evento (no se commitea)
+│   └── {eventId}/
+│       └── uploads/         # Fotos subidas por invitados
 ├── scripts/
 │   └── backup.sh            # Script de backup MySQL
 ├── backups/                 # Backups diarios (no se commitea)
@@ -231,4 +233,4 @@ gunzip -c /opt/partywall/backups/partywall_YYYYMMDD_HHMMSS.sql.gz | mysql -u roo
 - Contraseñas de operarios hasheadas con bcrypt (10 rounds)
 - MySQL solo acepta conexiones locales (`127.0.0.1`)
 - Rate limiting en uploads: 3 fotos por minuto por IP
-- Archivos `.env` y `uploads/` excluidos del repositorio
+- Archivos `.env` y `storage/` excluidos del repositorio

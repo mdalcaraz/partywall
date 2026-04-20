@@ -10,8 +10,8 @@ public/assets/
 .env.local
 .env.*.local
 
-# Fotos subidas por usuarios
-uploads/
+# Storage de eventos (fotos, etc.)
+storage/
 
 # SQLite (legacy)
 *.db

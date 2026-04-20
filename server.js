@@ -97,21 +97,21 @@ function stopSlideshow(eventId) {
 }
 
 // ── Express + Socket.io ───────────────────────────────────────────────────
-if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+if (!fs.existsSync('storage')) fs.mkdirSync('storage');
 
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server);
 
 app.use(BASE, express.static('public'));
-app.use(`${BASE}/uploads`, express.static('uploads'));
+app.use(`${BASE}/storage`, express.static('storage'));
 app.use(express.json());
 app.get('/', (req, res) => res.redirect(301, `${BASE}/`));
 
 // ── Multer ────────────────────────────────────────────────────────────────
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = `uploads/${req.params.eventId}`;
+    const dir = `storage/${req.params.eventId}/uploads`;
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
@@ -232,7 +232,7 @@ app.delete(`${BASE}/api/events/:id`, requireSuperAdmin, async (req, res) => {
   const event = await Event.findByPk(req.params.id);
   if (!event) return res.status(404).json({ error: 'No encontrado' });
 
-  try { fs.rmSync(`uploads/${req.params.id}`, { recursive: true, force: true }); } catch {}
+  try { fs.rmSync(`storage/${req.params.id}`, { recursive: true, force: true }); } catch {}
   await event.destroy();
   res.json({ success: true });
 });
@@ -266,7 +266,7 @@ app.patch(`${BASE}/api/e/:eventId/photos/:photoId/slideshow`, requireAnyAdmin, a
 app.delete(`${BASE}/api/e/:eventId/photos/:photoId`, requireAnyAdmin, async (req, res) => {
   const photo = await Photo.findOne({ where: { id: req.params.photoId, event_id: req.params.eventId } });
   if (!photo) return res.status(404).json({ error: 'No encontrada' });
-  try { fs.unlinkSync(`uploads/${req.params.eventId}/${photo.filename}`); } catch {}
+  try { fs.unlinkSync(`storage/${req.params.eventId}/uploads/${photo.filename}`); } catch {}
   await photo.destroy();
   io.to(`event:${req.params.eventId}`).emit('foto_eliminada', { id: req.params.photoId });
   res.json({ success: true });
@@ -289,7 +289,7 @@ app.post(`${BASE}/api/e/:eventId/upload`, upload.single('photo'), async (req, re
   }
 
   const id        = path.basename(req.file.filename, path.extname(req.file.filename));
-  const url       = `${BASE}/uploads/${req.params.eventId}/${req.file.filename}`;
+  const url       = `${BASE}/storage/${req.params.eventId}/uploads/${req.file.filename}`;
   const timestamp = new Date().toISOString();
 
   const newPhoto = await Photo.create({ id, event_id: req.params.eventId, filename: req.file.filename, url, timestamp });
