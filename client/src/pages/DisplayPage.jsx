@@ -3,6 +3,35 @@ import { useParams } from 'react-router-dom'
 import { getSocket } from '../lib/socket'
 import s from './DisplayPage.module.css'
 
+function MusicOverlay({ request }) {
+  const [visible, setVisible] = useState(false)
+  const prev = useRef(null)
+
+  useEffect(() => {
+    if (request) {
+      setVisible(true)
+      prev.current = request
+    } else {
+      setVisible(false)
+    }
+  }, [request?.id])
+
+  const r = request || prev.current
+  if (!r) return null
+
+  return (
+    <div className={`${s.musicOverlay} ${visible ? s.musicOverlayShow : ''}`}>
+      {r.album_art && <img src={r.album_art} alt="" className={s.musicOverlayArt} />}
+      <div className={s.musicOverlayText}>
+        <div className={s.musicOverlayLabel}>Sonando ahora</div>
+        <div className={s.musicOverlayName}>{r.track_name}</div>
+        <div className={s.musicOverlayArtist}>{r.artist_name}</div>
+      </div>
+      <div className={s.eqBars}><span /><span /><span /><span /></div>
+    </div>
+  )
+}
+
 function useImageCrossfade() {
   const [urlA, setUrlA]         = useState('')
   const [urlB, setUrlB]         = useState('')
@@ -28,40 +57,65 @@ function useImageCrossfade() {
 export default function DisplayPage() {
   const { eventId } = useParams()
   const { urlA, urlB, activeSlot, showImage, onLoad } = useImageCrossfade()
-  const [hasPhoto, setHasPhoto]     = useState(false)
-  const [ssActive, setSsActive]     = useState(false)
-  const [ssInterval, setSsInterval] = useState(5000)
-  const [ssProgress, setSsProgress] = useState(0)
-  const [notif, setNotif]           = useState({ msg: '', visible: false })
-  const [qrImg, setQrImg]           = useState(null)
+  const [hasPhoto, setHasPhoto]         = useState(false)
+  const [ssActive, setSsActive]         = useState(false)
+  const [ssInterval, setSsInterval]     = useState(5000)
+  const [ssProgress, setSsProgress]     = useState(0)
+  const [notif, setNotif]               = useState({ msg: '', visible: false })
+  const [qrImg, setQrImg]               = useState(null)
+  const [musicQrImg, setMusicQrImg]     = useState(null)
+  const [musicRequests, setMusicRequests] = useState([])
   const notifTimer = useRef(null)
   const ssTimer    = useRef(null)
 
+  const playingTrack = musicRequests.find(r => r.status === 'playing') || null
+
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}api/e/${eventId}/qr`)
+    const BASE = import.meta.env.BASE_URL
+    fetch(`${BASE}api/e/${eventId}/qr`)
       .then((r) => r.json())
       .then((data) => setQrImg(data.qr))
+    fetch(`${BASE}api/e/${eventId}/music/qr/public`)
+      .then((r) => r.json())
+      .then((data) => { if (data.enabled && data.qr) setMusicQrImg(data.qr) })
+      .catch(() => {})
   }, [eventId])
 
   useEffect(() => {
     if (!eventId) return
     const socket = getSocket(eventId)
 
-    const onEstado    = ({ current }) => { if (current) { showImage(current.url); setHasPhoto(true) } }
+    const onEstado    = ({ current, musicRequests: mr }) => {
+      if (current) { showImage(current.url); setHasPhoto(true) }
+      if (mr) setMusicRequests(mr)
+    }
     const onMostrar   = (photo) => { if (!photo) { showImage(null); setHasPhoto(false); return }; showImage(photo.url); setHasPhoto(true) }
     const onNueva     = () => showNotif('📸 Nueva foto recibida')
     const onSlideshow = ({ active, interval }) => { setSsActive(active); if (active && interval) setSsInterval(interval) }
 
-    socket.on('estado_inicial',   onEstado)
-    socket.on('mostrar_foto',     onMostrar)
-    socket.on('nueva_foto',       onNueva)
-    socket.on('slideshow_estado', onSlideshow)
+    const onMusicNueva       = (r)              => setMusicRequests(prev => [...prev, r])
+    const onMusicActualizada = ({ id, status }) => setMusicRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r))
+    const onMusicEliminada   = ({ id })         => setMusicRequests(prev => prev.filter(r => r.id !== id))
+    const onMusicCleared     = ()               => setMusicRequests(prev => prev.map(r => r.status === 'playing' ? { ...r, status: 'pending' } : r))
+
+    socket.on('estado_inicial',        onEstado)
+    socket.on('mostrar_foto',          onMostrar)
+    socket.on('nueva_foto',            onNueva)
+    socket.on('slideshow_estado',      onSlideshow)
+    socket.on('music_nueva',           onMusicNueva)
+    socket.on('music_actualizada',     onMusicActualizada)
+    socket.on('music_eliminada',       onMusicEliminada)
+    socket.on('music_playing_cleared', onMusicCleared)
 
     return () => {
-      socket.off('estado_inicial',   onEstado)
-      socket.off('mostrar_foto',     onMostrar)
-      socket.off('nueva_foto',       onNueva)
-      socket.off('slideshow_estado', onSlideshow)
+      socket.off('estado_inicial',        onEstado)
+      socket.off('mostrar_foto',          onMostrar)
+      socket.off('nueva_foto',            onNueva)
+      socket.off('slideshow_estado',      onSlideshow)
+      socket.off('music_nueva',           onMusicNueva)
+      socket.off('music_actualizada',     onMusicActualizada)
+      socket.off('music_eliminada',       onMusicEliminada)
+      socket.off('music_playing_cleared', onMusicCleared)
     }
   }, [eventId]) // eslint-disable-line
 
@@ -121,14 +175,23 @@ export default function DisplayPage() {
         <span className={s.igHandle}>@topdjgroup</span>
       </div>
 
+      {musicQrImg && (
+        <div className={s.qrCornerLeft}>
+          <div className={s.qrLabel}>Pedí tu tema</div>
+          <img src={musicQrImg} alt="QR Música" className={s.qrImg} />
+        </div>
+      )}
+
       {qrImg && (
         <div className={s.qrCorner}>
-          <div className={s.qrLabel}>Escaneá para enviar tu foto</div>
+          <div className={s.qrLabel}>Enviá tu foto</div>
           <img src={qrImg} alt="QR" className={s.qrImg} />
         </div>
       )}
 
       {ssActive && <div className={s.ssBar} style={{ width: `${ssProgress}%` }} />}
+
+      <MusicOverlay request={playingTrack} />
 
       <div className={`${s.notif} ${notif.visible ? s.notifShow : ''}`}>{notif.msg}</div>
     </div>

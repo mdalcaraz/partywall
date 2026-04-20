@@ -4,6 +4,7 @@ import SuperAdminPage  from './pages/SuperAdminPage'
 import AdminPage       from './pages/AdminPage'
 import GuestPage       from './pages/GuestPage'
 import DisplayPage     from './pages/DisplayPage'
+import MusicPage       from './pages/MusicPage'
 import ProtectedRoute  from './components/ProtectedRoute'
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
 
       <Route path="/e/:eventId/guest"   element={<GuestPage />} />
       <Route path="/e/:eventId/display" element={<DisplayPage />} />
+      <Route path="/e/:eventId/music"   element={<MusicPage />} />
 
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

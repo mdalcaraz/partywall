@@ -46,10 +46,29 @@
       "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"cd /opt/partywall && git init && git remote add origin https://github.com/mdalcaraz/partywall.git && git fetch origin && git reset --hard origin/main && pm2 restart partywall\")",
       "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"sudo git init /opt/partywall && sudo git -C /opt/partywall remote add origin https://github.com/mdalcaraz/partywall.git && sudo git -C /opt/partywall fetch origin && sudo git -C /opt/partywall reset --hard origin/main\")",
       "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"sudo pm2 restart partywall && sudo pm2 status\")",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"mysql --version 2>/dev/null || echo 'NO_MYSQL'\")",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"sudo apt-get update -qq && sudo apt-get install -y mysql-server 2>&1 | tail -5\")",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"mysql --version && sudo systemctl status mysql --no-pager | head -5\")",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 'sudo mysql -e \" *)",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"sudo sed -i 's/^port\\\\s*=.*/port = 3316/' /etc/mysql/mysql.conf.d/mysqld.cnf; grep -n 'port' /etc/mysql/mysql.conf.d/mysqld.cnf | head -5\")",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 ' *)",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"mysql -u root -p123456 -P 3316 -h 127.0.0.1 -e 'SHOW DATABASES;' 2>&1\")",
+      "Bash(mysql -u root -p123456 -P 3316 -h 127.0.0.1 -e \"CREATE DATABASE IF NOT EXISTS partywall CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; SHOW DATABASES;\")",
+      "Read(//c/Program Files/**)",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"cat /etc/timezone && whoami && node --version && npm --version\")",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"sudo pm2 startup systemd -u root --hp /root 2>&1\")",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"sudo pm2 save && echo 'PM2 saved'\")",
+      "Bash(git checkout *)",
+      "Bash(npx sequelize-cli *)",
+      "Bash(git reset *)",
+      "Bash(git fsck *)",
+      "Bash(git restore *)"
     ],
     "additionalDirectories": [
-      "F:\\partywall"
+      "F:\\partywall",
+      "f:\\partywall\\.git\\refs\\heads\\feature"
     ]
   }
 }

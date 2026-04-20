@@ -226,6 +226,12 @@ export default function GuestPage() {
               <span>No se pudo acceder a la cámara.<br />Asegurate de dar permiso.</span>
             </div>
           )}
+          {cooldown > 0 && (
+            <div className={s.cooldownOverlay}>
+              <div className={s.cooldownNum}>{cooldown}</div>
+              <div className={s.cooldownMsg}>Podés volver a enviar en un momento</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -265,11 +271,6 @@ export default function GuestPage() {
         )}
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickFromGallery} />
 
-        {cooldown > 0 && (
-          <div className={s.cooldown}>
-            Límite alcanzado — esperá <strong>{cooldown}s</strong>
-          </div>
-        )}
         <div className={`${s.status} ${s[status.type]}`}>{status.text}</div>
       </div>
 
