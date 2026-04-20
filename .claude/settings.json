@@ -38,7 +38,18 @@
       "Bash(node setup-server.mjs)",
       "Bash(node upload-app.mjs)",
       "Bash(node -e *)",
-      "Read(//c/Users/MDalc/.ssh/**)"
+      "Read(//c/Users/MDalc/.ssh/**)",
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(git push *)",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 mdalcaraz@66.94.108.215 \"echo conectado\")",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"cd /opt/partywall && git init && git remote add origin https://github.com/mdalcaraz/partywall.git && git fetch origin && git reset --hard origin/main && pm2 restart partywall\")",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"sudo git init /opt/partywall && sudo git -C /opt/partywall remote add origin https://github.com/mdalcaraz/partywall.git && sudo git -C /opt/partywall fetch origin && sudo git -C /opt/partywall reset --hard origin/main\")",
+      "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"sudo pm2 restart partywall && sudo pm2 status\")",
+      "Bash(git add *)"
+    ],
+    "additionalDirectories": [
+      "F:\\partywall"
     ]
   }
 }

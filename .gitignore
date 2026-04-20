@@ -2,10 +2,10 @@
 node_modules/
 client/node_modules/
 
-# Build output (generado por `npm run build` en client/)
+# Build
 public/assets/
 
-# Archivos de entorno — nunca commitear credenciales
+# Entorno — nunca commitear credenciales
 .env
 .env.local
 .env.*.local
@@ -13,14 +13,16 @@ public/assets/
 # Fotos subidas por usuarios
 uploads/
 
-# Binario de cloudflare tunnel
-cloudflared.exe
+# SQLite (legacy)
+*.db
+*.db-shm
+*.db-wal
 
 # Logs
 *.log
 npm-debug.log*
 
-# Sistema operativo
+# OS
 .DS_Store
 Thumbs.db
 desktop.ini
@@ -28,10 +30,6 @@ desktop.ini
 # Editores
 .vscode/
 .idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
 
 # Vite
 client/.vite/

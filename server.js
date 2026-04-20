@@ -10,7 +10,7 @@ const os      = require('os');
 const crypto  = require('crypto');
 const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
-const { q }   = require('./db');
+const { sequelize, Event, Photo } = require('./models');
 
 // ── Config ────────────────────────────────────────────────────────────────
 function getLocalIP() {
@@ -58,8 +58,15 @@ function requireAnyAdmin(req, res, next) {
   req.user = p; next();
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────
+function normalize(photo) {
+  if (!photo) return null;
+  const p = photo.toJSON ? photo.toJSON() : photo;
+  return { ...p, inSlideshow: !!p.in_slideshow };
+}
+
 // ── Slideshow state (in-memory timers, per event) ─────────────────────────
-const slideshowTimers = new Map(); // eventId → { timer, interval, active }
+const slideshowTimers = new Map();
 
 function getSsState(eventId) {
   if (!slideshowTimers.has(eventId))
@@ -70,16 +77,16 @@ function getSsState(eventId) {
 function startSlideshow(eventId) {
   stopSlideshow(eventId);
   const ss = getSsState(eventId);
-  const eligible = q.getSlideshowPhotos.all(eventId);
-  if (!eligible.length) return;
   let idx = -1;
   ss.active = true;
-  ss.timer = setInterval(() => {
-    const current = q.getSlideshowPhotos.all(eventId);
-    if (!current.length) return;
-    idx = (idx + 1) % current.length;
-    const photo = current[idx];
-    io.to(`event:${eventId}`).emit('mostrar_foto', normalize(photo));
+  ss.timer = setInterval(async () => {
+    const photos = await Photo.findAll({
+      where:   { event_id: eventId, in_slideshow: true },
+      order:   [['timestamp', 'ASC']],
+    });
+    if (!photos.length) return;
+    idx = (idx + 1) % photos.length;
+    io.to(`event:${eventId}`).emit('mostrar_foto', normalize(photos[idx]));
   }, ss.interval);
 }
 
@@ -87,11 +94,6 @@ function stopSlideshow(eventId) {
   const ss = getSsState(eventId);
   if (ss.timer) { clearInterval(ss.timer); ss.timer = null; }
   ss.active = false;
-}
-
-function normalize(photo) {
-  if (!photo) return null;
-  return { ...photo, inSlideshow: photo.in_slideshow === 1 };
 }
 
 // ── Express + Socket.io ───────────────────────────────────────────────────
@@ -132,9 +134,9 @@ const uploadLimits = new Map();
 const RL_MAX = 3, RL_WINDOW = 60 * 1000;
 
 function checkUploadLimit(req) {
-  const ip  = req.headers['cf-connecting-ip'] || req.ip;
-  const key = `${req.params.eventId}:${ip}`;
-  const now = Date.now();
+  const ip    = req.headers['cf-connecting-ip'] || req.ip;
+  const key   = `${req.params.eventId}:${ip}`;
+  const now   = Date.now();
   const entry = uploadLimits.get(key) || { timestamps: [] };
   entry.timestamps = entry.timestamps.filter(t => now - t < RL_WINDOW);
   if (entry.timestamps.length >= RL_MAX) {
@@ -148,24 +150,24 @@ function checkUploadLimit(req) {
 }
 
 // ── API: Login ────────────────────────────────────────────────────────────
-app.post(`${BASE}/api/login`, (req, res) => {
+app.post(`${BASE}/api/login`, async (req, res) => {
   const { username, password } = req.body;
 
   if (username === SA_USER && password === SA_PASS) {
     return res.json({
       success: true,
       token: signToken({ role: 'superadmin', sub: username }),
-      role: 'superadmin'
+      role: 'superadmin',
     });
   }
 
-  const event = q.getEventByUser.get(username);
+  const event = await Event.findOne({ where: { op_user: username, active: true } });
   if (event && bcrypt.compareSync(password, event.op_pass)) {
     return res.json({
       success: true,
       token: signToken({ role: 'operario', sub: username, eventId: event.id, eventName: event.name }),
       role: 'operario',
-      eventId: event.id
+      eventId: event.id,
     });
   }
 
@@ -173,11 +175,16 @@ app.post(`${BASE}/api/login`, (req, res) => {
 });
 
 // ── API: SuperAdmin — Events ──────────────────────────────────────────────
-app.get(`${BASE}/api/events`, requireSuperAdmin, (req, res) => {
-  res.json(q.listEvents.all());
+app.get(`${BASE}/api/events`, requireSuperAdmin, async (req, res) => {
+  const events = await Event.findAll({ order: [['created_at', 'DESC']] });
+  const result = await Promise.all(events.map(async e => {
+    const photo_count = await Photo.count({ where: { event_id: e.id } });
+    return { ...e.toJSON(), photo_count };
+  }));
+  res.json(result);
 });
 
-app.post(`${BASE}/api/events`, requireSuperAdmin, (req, res) => {
+app.post(`${BASE}/api/events`, requireSuperAdmin, async (req, res) => {
   const { name, date, opUser, opPass } = req.body;
   if (!name || !opUser || !opPass)
     return res.status(400).json({ error: 'Faltan campos: name, opUser, opPass' });
@@ -186,81 +193,90 @@ app.post(`${BASE}/api/events`, requireSuperAdmin, (req, res) => {
   const hashedPass = bcrypt.hashSync(opPass, 10);
 
   try {
-    q.createEvent.run(id, name, date || null, opUser, hashedPass);
-    res.json({ success: true, event: q.getEventById.get(id) });
+    await Event.create({ id, name, date: date || null, op_user: opUser, op_pass: hashedPass });
+    const event = await Event.findByPk(id);
+    res.json({ success: true, event: event.toJSON() });
   } catch (e) {
-    if (e.message.includes('UNIQUE'))
+    if (e.name === 'SequelizeUniqueConstraintError')
       return res.status(409).json({ error: 'El usuario ya existe' });
+    console.error(e);
     res.status(500).json({ error: 'Error al crear evento' });
   }
 });
 
-app.patch(`${BASE}/api/events/:id`, requireSuperAdmin, (req, res) => {
+app.patch(`${BASE}/api/events/:id`, requireSuperAdmin, async (req, res) => {
   const { name, date, opUser, opPass } = req.body;
-  const hashedPass = opPass ? bcrypt.hashSync(opPass, 10) : null;
+  const updates = {};
+  if (name)   updates.name    = name;
+  if (date)   updates.date    = date;
+  if (opUser) updates.op_user = opUser;
+  if (opPass) updates.op_pass = bcrypt.hashSync(opPass, 10);
+
   try {
-    q.updateEvent.run(name || null, date || null, opUser || null, hashedPass, req.params.id);
-    res.json({ success: true, event: q.getEventById.get(req.params.id) });
+    await Event.update(updates, { where: { id: req.params.id } });
+    const event = await Event.findByPk(req.params.id);
+    res.json({ success: true, event: event.toJSON() });
   } catch (e) {
-    if (e.message.includes('UNIQUE'))
+    if (e.name === 'SequelizeUniqueConstraintError')
       return res.status(409).json({ error: 'El usuario ya existe' });
     res.status(500).json({ error: 'Error al actualizar' });
   }
 });
 
-app.patch(`${BASE}/api/events/:id/active`, requireSuperAdmin, (req, res) => {
-  q.setEventActive.run(req.body.active ? 1 : 0, req.params.id);
+app.patch(`${BASE}/api/events/:id/active`, requireSuperAdmin, async (req, res) => {
+  await Event.update({ active: !!req.body.active }, { where: { id: req.params.id } });
   res.json({ success: true });
 });
 
-app.delete(`${BASE}/api/events/:id`, requireSuperAdmin, (req, res) => {
-  const event = q.getEventById.get(req.params.id);
+app.delete(`${BASE}/api/events/:id`, requireSuperAdmin, async (req, res) => {
+  const event = await Event.findByPk(req.params.id);
   if (!event) return res.status(404).json({ error: 'No encontrado' });
 
   try { fs.rmSync(`uploads/${req.params.id}`, { recursive: true, force: true }); } catch {}
-  q.deleteEvent.run(req.params.id);
+  await event.destroy();
   res.json({ success: true });
 });
 
-// ── API: Event (operario + superadmin) ───────────────────────────────────
-app.get(`${BASE}/api/e/:eventId/photos`, requireAnyAdmin, (req, res) => {
-  res.json(q.getPhotos.all(req.params.eventId).map(normalize));
+// ── API: Event (operario + superadmin) ────────────────────────────────────
+app.get(`${BASE}/api/e/:eventId/photos`, requireAnyAdmin, async (req, res) => {
+  const photos = await Photo.findAll({
+    where: { event_id: req.params.eventId },
+    order: [['timestamp', 'DESC']],
+  });
+  res.json(photos.map(normalize));
 });
 
-app.get(`${BASE}/api/e/:eventId/qr`, (req, res) => {
-  const event = q.getEventById.get(req.params.eventId);
+app.get(`${BASE}/api/e/:eventId/qr`, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
   if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
   const base = TUNNEL_URL || `http://${LOCAL_IP}:${PORT}`;
   const url  = `${base}${BASE}/e/${req.params.eventId}/guest`;
-  QRCode.toDataURL(url, { width: 300, margin: 2, color: { dark: '#000', light: '#fff' } })
-    .then(qr => res.json({ url, qr }));
+  const qr   = await QRCode.toDataURL(url, { width: 300, margin: 2, color: { dark: '#000', light: '#fff' } });
+  res.json({ url, qr });
 });
 
-app.patch(`${BASE}/api/e/:eventId/photos/:photoId/slideshow`, requireAnyAdmin, (req, res) => {
-  const photo = q.getPhoto.get(req.params.photoId, req.params.eventId);
+app.patch(`${BASE}/api/e/:eventId/photos/:photoId/slideshow`, requireAnyAdmin, async (req, res) => {
+  const photo = await Photo.findOne({ where: { id: req.params.photoId, event_id: req.params.eventId } });
   if (!photo) return res.status(404).json({ error: 'No encontrada' });
-  q.toggleSlideshow.run(req.params.photoId, req.params.eventId);
-  const updated = q.getPhoto.get(req.params.photoId, req.params.eventId);
-  io.to(`event:${req.params.eventId}`).emit('foto_actualizada', {
-    id: updated.id, inSlideshow: updated.in_slideshow === 1
-  });
-  res.json({ success: true, inSlideshow: updated.in_slideshow === 1 });
+  await photo.update({ in_slideshow: !photo.in_slideshow });
+  io.to(`event:${req.params.eventId}`).emit('foto_actualizada', { id: photo.id, inSlideshow: photo.in_slideshow });
+  res.json({ success: true, inSlideshow: photo.in_slideshow });
 });
 
-app.delete(`${BASE}/api/e/:eventId/photos/:photoId`, requireAnyAdmin, (req, res) => {
-  const photo = q.getPhoto.get(req.params.photoId, req.params.eventId);
+app.delete(`${BASE}/api/e/:eventId/photos/:photoId`, requireAnyAdmin, async (req, res) => {
+  const photo = await Photo.findOne({ where: { id: req.params.photoId, event_id: req.params.eventId } });
   if (!photo) return res.status(404).json({ error: 'No encontrada' });
   try { fs.unlinkSync(`uploads/${req.params.eventId}/${photo.filename}`); } catch {}
-  q.deletePhoto.run(req.params.photoId, req.params.eventId);
+  await photo.destroy();
   io.to(`event:${req.params.eventId}`).emit('foto_eliminada', { id: req.params.photoId });
   res.json({ success: true });
 });
 
 // ── API: Upload (public, rate-limited) ────────────────────────────────────
-app.post(`${BASE}/api/e/:eventId/upload`, upload.single('photo'), (req, res) => {
+app.post(`${BASE}/api/e/:eventId/upload`, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Sin archivo' });
 
-  const event = q.getEventById.get(req.params.eventId);
+  const event = await Event.findByPk(req.params.eventId);
   if (!event || !event.active) {
     try { fs.unlinkSync(req.file.path); } catch {}
     return res.status(404).json({ error: 'Evento no encontrado o inactivo' });
@@ -276,8 +292,8 @@ app.post(`${BASE}/api/e/:eventId/upload`, upload.single('photo'), (req, res) => 
   const url       = `${BASE}/uploads/${req.params.eventId}/${req.file.filename}`;
   const timestamp = new Date().toISOString();
 
-  q.addPhoto.run(id, req.params.eventId, req.file.filename, url, timestamp);
-  const photo = normalize(q.getPhoto.get(id, req.params.eventId));
+  const newPhoto = await Photo.create({ id, event_id: req.params.eventId, filename: req.file.filename, url, timestamp });
+  const photo    = normalize(newPhoto);
 
   io.to(`event:${req.params.eventId}`).emit('nueva_foto', photo);
   console.log(`📸 [${req.params.eventId}] ${req.file.filename}`);
@@ -288,10 +304,9 @@ app.post(`${BASE}/api/e/:eventId/upload`, upload.single('photo'), (req, res) => 
 io.on('connection', (socket) => {
   console.log(`🔌 ${socket.id}`);
 
-  socket.on('join_event', ({ eventId, token }) => {
+  socket.on('join_event', async ({ eventId, token }) => {
     if (!eventId) return;
 
-    // Verify role if token provided
     if (token) {
       try {
         const p = jwt.verify(token, JWT_SECRET);
@@ -303,13 +318,17 @@ io.on('connection', (socket) => {
     socket.join(`event:${eventId}`);
     socket.data.currentEventId = eventId;
 
-    const photos    = q.getPhotos.all(eventId).slice(0, 50).map(normalize);
-    const ss        = getSsState(eventId);
+    const photos = await Photo.findAll({
+      where:  { event_id: eventId },
+      order:  [['timestamp', 'DESC']],
+      limit:  50,
+    });
+    const ss = getSsState(eventId);
 
     socket.emit('estado_inicial', {
       current:   null,
-      photos,
-      slideshow: { active: ss.active, interval: ss.interval }
+      photos:    photos.map(normalize),
+      slideshow: { active: ss.active, interval: ss.interval },
     });
     console.log(`📌 ${socket.id} → event:${eventId}`);
   });
@@ -350,12 +369,20 @@ app.get(`${BASE}/*`, (req, res) => {
 });
 
 // ── Arrancar ──────────────────────────────────────────────────────────────
-server.listen(PORT, '0.0.0.0', () => {
-  const lan = `http://${LOCAL_IP}:${PORT}`;
-  console.log('\n╔══════════════════════════════════════════════════════╗');
-  console.log('║           🎉 FOTOBOOTH SaaS ACTIVO                   ║');
-  console.log('╠══════════════════════════════════════════════════════╣');
-  console.log(`║  👑 Super Admin: ${lan}${BASE}/superadmin`);
-  console.log(`║  🔑 Login:       ${lan}${BASE}/login`);
-  console.log('╚══════════════════════════════════════════════════════╝\n');
-});
+sequelize.authenticate()
+  .then(() => {
+    console.log('✅ MySQL conectado');
+    return server.listen(PORT, '0.0.0.0', () => {
+      const lan = `http://${LOCAL_IP}:${PORT}`;
+      console.log('\n╔══════════════════════════════════════════════════════╗');
+      console.log('║              🎉 PARTYWALL ACTIVO                     ║');
+      console.log('╠══════════════════════════════════════════════════════╣');
+      console.log(`║  👑 Super Admin: ${lan}${BASE}/superadmin`);
+      console.log(`║  🔑 Login:       ${lan}${BASE}/login`);
+      console.log('╚══════════════════════════════════════════════════════╝\n');
+    });
+  })
+  .catch(err => {
+    console.error('❌ No se pudo conectar a MySQL:', err.message);
+    process.exit(1);
+  });

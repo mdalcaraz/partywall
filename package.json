@@ -1,26 +1,33 @@
 {
-  "name": "fotobooth-lan",
+  "name": "partywall",
   "version": "1.0.0",
-  "description": "Photo booth LAN server para eventos",
+  "description": "Photo booth SaaS para eventos — backend Node.js + MySQL",
   "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
-    "client-build": "cd client && npm install && npm run build",
-    "server": "nodemon server.js",
-    "dev": "concurrently \"npm run client-build\" \"npm run server\""
+    "start": "node server.js",
+    "dev": "concurrently \"nodemon server.js\" \"cd client && npm run dev\"",
+    "build": "cd client && npm install && npm run build",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "seed": "sequelize-cli db:seed:all"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.9.0",
     "dotenv": "^17.4.2",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.3",
     "multer": "^1.4.5-lts.1",
-    "nodemon": "^3.1.14",
+    "mysql2": "^3.11.0",
     "qrcode": "^1.5.3",
-    "selfsigned": "^2.4.1",
+    "sequelize": "^6.37.3",
     "socket.io": "^4.7.4"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.1.14",
+    "sequelize-cli": "^6.6.2"
   }
 }

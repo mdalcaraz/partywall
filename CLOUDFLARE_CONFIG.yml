@@ -1,7 +1,0 @@
-tunnel: a85e9c59-884c-4bab-b800-6044e309bbd1
-credentials-file: "C:/Users/MDalc/.cloudflared/a85e9c59-884c-4bab-b800-6044e309bbd1.json"
-
-ingress:
-  - hostname: fotobooth.topdjgroup.com
-    service: http://localhost:3000
-  - service: http_status:404
