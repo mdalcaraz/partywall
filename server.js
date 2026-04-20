@@ -189,8 +189,9 @@ function checkMusicLimit(req, event) {
   const entry = musicLimits.get(key) || { timestamps: [] };
   entry.timestamps = entry.timestamps.filter(t => now - t < windowMs);
   if (entry.timestamps.length >= maxReqs) {
+    const retryAfter = Math.ceil((entry.timestamps[0] + windowMs - now) / 1000);
     musicLimits.set(key, entry);
-    return { allowed: false };
+    return { allowed: false, retryAfter };
   }
   entry.timestamps.push(now);
   musicLimits.set(key, entry);
@@ -454,7 +455,7 @@ app.post(`${BASE}/api/e/:eventId/music/requests`, async (req, res) => {
   if (!event.music_enabled)     return res.status(403).json({ error: 'Música no disponible' });
 
   const limit = checkMusicLimit(req, event);
-  if (!limit.allowed) return res.status(429).json({ error: 'Demasiados pedidos, esperá un momento' });
+  if (!limit.allowed) return res.status(429).json({ error: 'Límite alcanzado', retryAfter: limit.retryAfter });
 
   const { trackId, trackName, artistName, albumName, albumArt, previewUrl } = req.body;
   if (!trackId || !trackName || !artistName) return res.status(400).json({ error: 'Faltan datos del tema' });

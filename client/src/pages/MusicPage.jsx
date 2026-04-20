@@ -34,11 +34,13 @@ export default function MusicPage() {
   const [toast, setToast]               = useState({ msg: '', type: '', v: false })
   const [preview, setPreview]           = useState(null)
   const [previewProgress, setProgress]  = useState(0)
+  const [cooldown, setCooldown]         = useState(0)
   const audioRef     = useRef(null)
   const progressRef  = useRef(null)
   const toastRef     = useRef(null)
   const debounceRef  = useRef(null)
   const lastSearched = useRef('')
+  const cooldownRef  = useRef(null)
 
   useEffect(() => {
     fetch(`${BASE}api/e/${eventId}/music/info`)
@@ -102,6 +104,17 @@ export default function MusicPage() {
     debounceRef.current = setTimeout(() => doSearch(v.trim()), 800)
   }
 
+  const startCooldown = (secs) => {
+    setCooldown(secs)
+    clearInterval(cooldownRef.current)
+    cooldownRef.current = setInterval(() => {
+      setCooldown(c => {
+        if (c <= 1) { clearInterval(cooldownRef.current); return 0 }
+        return c - 1
+      })
+    }, 1000)
+  }
+
   const requestTrack = async (track) => {
     try {
       const r = await fetch(`${BASE}api/e/${eventId}/music/requests`, {
@@ -117,6 +130,7 @@ export default function MusicPage() {
         }),
       })
       const d = await r.json()
+      if (r.status === 429) { startCooldown(d.retryAfter || 60); return }
       if (!r.ok) { showToast(d.error || 'Error al pedir', 'error'); return }
       setRequested(prev => new Set([...prev, track.id]))
       showToast(`¡Pedido! ${track.artist} — ${track.name}`, 'success')
@@ -159,9 +173,6 @@ export default function MusicPage() {
     return requests.some(r => r.track_id === trackId && (r.status === 'pending' || r.status === 'playing'))
   }
 
-  const pendingRequests = requests.filter(r => r.status === 'pending')
-  const playingRequest  = requests.find(r => r.status === 'playing')
-
   // ── Loading ──────────────────────────────────────────────────────────────
   if (available === null) {
     return (
@@ -199,21 +210,6 @@ export default function MusicPage() {
         {eventName && <div className={s.heroEvent}>{eventName}</div>}
       </div>
 
-      {/* ── Now playing ── */}
-      {playingRequest && (
-        <div className={s.nowPlaying}>
-          {playingRequest.album_art && (
-            <img src={playingRequest.album_art} alt="" className={s.nowPlayingArt} />
-          )}
-          <div className={s.nowPlayingInfo}>
-            <div className={s.nowPlayingLabel}>Sonando ahora</div>
-            <div className={s.nowPlayingName}>{playingRequest.track_name}</div>
-            <div className={s.nowPlayingArtist}>{playingRequest.artist_name}</div>
-          </div>
-          <div className={s.equalizerBars}><span /><span /><span /><span /></div>
-        </div>
-      )}
-
       {/* ── Search ── */}
       <div className={s.searchWrap}>
         <div className={s.searchBox}>
@@ -236,6 +232,14 @@ export default function MusicPage() {
           )}
         </div>
       </div>
+
+      {/* ── Cooldown banner ── */}
+      {cooldown > 0 && (
+        <div className={s.cooldownBanner}>
+          <span className={s.cooldownIcon}>⏳</span>
+          <span>Ya mandaste tus pedidos · podés pedir de nuevo en <strong>{cooldown}s</strong></span>
+        </div>
+      )}
 
       {/* ── Search results ── */}
       {tracks.length > 0 && (
@@ -279,15 +283,14 @@ export default function MusicPage() {
                   <div className={s.trackArtist}>{track.artist}</div>
                   <div className={s.trackMeta}>
                     {track.album} · {msToMin(track.durationMs)}
-                    {track.previewUrl && !isPreviewing && <span className={s.previewHint}> · ▶ Preview</span>}
                   </div>
                 </div>
                 <button
-                  className={`${s.btnPedir} ${done ? s.btnPedirDone : ''}`}
-                  onClick={() => !done && requestTrack(track)}
-                  disabled={done}
+                  className={`${s.btnPedir} ${done || cooldown > 0 ? s.btnPedirDone : ''} ${cooldown > 0 && !done ? s.btnPedirCooldown : ''}`}
+                  onClick={() => !done && !cooldown && requestTrack(track)}
+                  disabled={done || cooldown > 0}
                 >
-                  {done ? '✓' : 'Pedir'}
+                  {done ? '✓' : cooldown > 0 ? `${cooldown}s` : 'Pedir'}
                 </button>
               </div>
             )
@@ -303,28 +306,8 @@ export default function MusicPage() {
         </div>
       )}
 
-      {/* ── Queue ── */}
-      {pendingRequests.length > 0 && (
-        <div className={s.queue}>
-          <div className={s.queueTitle}>Cola de pedidos</div>
-          {pendingRequests.map((r, i) => (
-            <div key={r.id} className={s.queueItem}>
-              <div className={s.queueNum}>{i + 1}</div>
-              {r.album_art
-                ? <img src={r.album_art} alt="" className={s.queueArt} />
-                : <div className={s.queueArtPlaceholder}>🎵</div>
-              }
-              <div className={s.queueInfo}>
-                <div className={s.queueName}>{r.track_name}</div>
-                <div className={s.queueArtist}>{r.artist_name}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* ── Hint (idle state) ── */}
-      {!query && tracks.length === 0 && pendingRequests.length === 0 && !playingRequest && (
+      {!query && tracks.length === 0 && (
         <div className={s.hint}>
           <div className={s.hintIcon}>🎶</div>
           <div className={s.hintText}>
