@@ -10,7 +10,7 @@ const os      = require('os');
 const crypto  = require('crypto');
 const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
-const { sequelize, Event, Photo } = require('./models');
+const { sequelize, Event, Photo, MusicRequest } = require('./models');
 
 // ── Config ────────────────────────────────────────────────────────────────
 function getLocalIP() {
@@ -96,6 +96,31 @@ function stopSlideshow(eventId) {
   ss.active = false;
 }
 
+// ── Spotify token cache ───────────────────────────────────────────────────
+let _spotifyTok = { value: null, expiresAt: 0 };
+
+async function getSpotifyToken() {
+  if (Date.now() < _spotifyTok.expiresAt - 60000) return _spotifyTok.value;
+  const clientId     = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
+  const creds = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  try {
+    const r = await fetch('https://accounts.spotify.com/api/token', {
+      method:  'POST',
+      headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    'grant_type=client_credentials',
+    });
+    const d = await r.json();
+    if (!d.access_token) return null;
+    _spotifyTok = { value: d.access_token, expiresAt: Date.now() + d.expires_in * 1000 };
+    return d.access_token;
+  } catch (err) {
+    console.error('Spotify token error:', err.message);
+    return null;
+  }
+}
+
 // ── Express + Socket.io ───────────────────────────────────────────────────
 if (!fs.existsSync('storage')) fs.mkdirSync('storage');
 
@@ -146,6 +171,24 @@ function checkUploadLimit(req) {
   }
   entry.timestamps.push(now);
   uploadLimits.set(key, entry);
+  return { allowed: true };
+}
+
+const musicLimits = new Map();
+const ML_MAX = 10, ML_WINDOW = 10 * 60 * 1000;
+
+function checkMusicLimit(req) {
+  const ip    = req.headers['cf-connecting-ip'] || req.ip;
+  const key   = `music:${req.params.eventId}:${ip}`;
+  const now   = Date.now();
+  const entry = musicLimits.get(key) || { timestamps: [] };
+  entry.timestamps = entry.timestamps.filter(t => now - t < ML_WINDOW);
+  if (entry.timestamps.length >= ML_MAX) {
+    musicLimits.set(key, entry);
+    return { allowed: false };
+  }
+  entry.timestamps.push(now);
+  musicLimits.set(key, entry);
   return { allowed: true };
 }
 
@@ -228,6 +271,11 @@ app.patch(`${BASE}/api/events/:id/active`, requireSuperAdmin, async (req, res) =
   res.json({ success: true });
 });
 
+app.patch(`${BASE}/api/events/:id/music`, requireSuperAdmin, async (req, res) => {
+  await Event.update({ music_enabled: !!req.body.enabled }, { where: { id: req.params.id } });
+  res.json({ success: true });
+});
+
 app.delete(`${BASE}/api/events/:id`, requireSuperAdmin, async (req, res) => {
   const event = await Event.findByPk(req.params.id);
   if (!event) return res.status(404).json({ error: 'No encontrado' });
@@ -237,7 +285,7 @@ app.delete(`${BASE}/api/events/:id`, requireSuperAdmin, async (req, res) => {
   res.json({ success: true });
 });
 
-// ── API: Event (operario + superadmin) ────────────────────────────────────
+// ── API: Event — Photos (operario + superadmin) ───────────────────────────
 app.get(`${BASE}/api/e/:eventId/photos`, requireAnyAdmin, async (req, res) => {
   const photos = await Photo.findAll({
     where: { event_id: req.params.eventId },
@@ -300,6 +348,136 @@ app.post(`${BASE}/api/e/:eventId/upload`, upload.single('photo'), async (req, re
   res.json({ success: true, photo });
 });
 
+// ── API: Music — Spotify search (public) ──────────────────────────────────
+app.get(`${BASE}/api/e/:eventId/music/search`, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event || !event.active)        return res.status(404).json({ error: 'Evento no encontrado' });
+  if (!event.music_enabled)           return res.status(403).json({ error: 'Música no disponible en este evento' });
+
+  const q = (req.query.q || '').trim();
+  if (q.length < 2) return res.status(400).json({ error: 'Búsqueda muy corta' });
+
+  const token = await getSpotifyToken();
+  if (!token) return res.status(503).json({ error: 'Servicio de música no configurado' });
+
+  try {
+    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10&market=AR`;
+    const r   = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const d   = await r.json();
+
+    const tracks = (d.tracks?.items || []).map(t => ({
+      id:         t.id,
+      name:       t.name,
+      artist:     t.artists.map(a => a.name).join(', '),
+      album:      t.album.name,
+      albumArt:   t.album.images[1]?.url || t.album.images[0]?.url || null,
+      previewUrl: t.preview_url || null,
+      durationMs: t.duration_ms,
+    }));
+
+    res.json({ tracks });
+  } catch (err) {
+    console.error('Spotify search error:', err.message);
+    res.status(500).json({ error: 'Error al buscar en Spotify' });
+  }
+});
+
+// ── API: Music — Info de evento para MusicPage (public) ───────────────────
+app.get(`${BASE}/api/e/:eventId/music/info`, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
+  res.json({
+    name:          event.name,
+    active:        event.active,
+    music_enabled: event.music_enabled,
+  });
+});
+
+// ── API: Music — Submit request (public) ──────────────────────────────────
+app.post(`${BASE}/api/e/:eventId/music/requests`, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event || !event.active)  return res.status(404).json({ error: 'Evento no encontrado' });
+  if (!event.music_enabled)     return res.status(403).json({ error: 'Música no disponible' });
+
+  const limit = checkMusicLimit(req);
+  if (!limit.allowed) return res.status(429).json({ error: 'Demasiados pedidos, esperá un momento' });
+
+  const { trackId, trackName, artistName, albumName, albumArt, previewUrl } = req.body;
+  if (!trackId || !trackName || !artistName) return res.status(400).json({ error: 'Faltan datos del tema' });
+
+  // Check if already requested and pending/playing
+  const all = await MusicRequest.findAll({ where: { event_id: req.params.eventId, track_id: trackId } });
+  const active = all.filter(r => r.status === 'pending' || r.status === 'playing');
+  if (active.length) return res.status(409).json({ error: 'Ese tema ya fue pedido' });
+
+  const id      = crypto.randomUUID();
+  const request = await MusicRequest.create({
+    id,
+    event_id:     req.params.eventId,
+    track_id:     trackId,
+    track_name:   trackName,
+    artist_name:  artistName,
+    album_name:   albumName  || null,
+    album_art:    albumArt   || null,
+    preview_url:  previewUrl || null,
+    status:       'pending',
+    requested_at: new Date(),
+  });
+
+  io.to(`event:${req.params.eventId}`).emit('music_nueva', request.toJSON());
+  console.log(`🎵 [${req.params.eventId}] ${artistName} — ${trackName}`);
+  res.json({ success: true, request: request.toJSON() });
+});
+
+// ── API: Music — List requests (admin) ────────────────────────────────────
+app.get(`${BASE}/api/e/:eventId/music/requests`, requireAnyAdmin, async (req, res) => {
+  const requests = await MusicRequest.findAll({
+    where: { event_id: req.params.eventId },
+    order: [['requested_at', 'ASC']],
+  });
+  res.json(requests.map(r => r.toJSON()));
+});
+
+// ── API: Music — Update status (admin) ────────────────────────────────────
+app.patch(`${BASE}/api/e/:eventId/music/requests/:id`, requireAnyAdmin, async (req, res) => {
+  const request = await MusicRequest.findOne({ where: { id: req.params.id, event_id: req.params.eventId } });
+  if (!request) return res.status(404).json({ error: 'No encontrado' });
+
+  const { status } = req.body;
+  if (!['pending', 'playing', 'done'].includes(status)) return res.status(400).json({ error: 'Estado inválido' });
+
+  if (status === 'playing') {
+    await MusicRequest.update(
+      { status: 'pending' },
+      { where: { event_id: req.params.eventId, status: 'playing' } }
+    );
+    io.to(`event:${req.params.eventId}`).emit('music_playing_cleared', {});
+  }
+
+  await request.update({ status });
+  io.to(`event:${req.params.eventId}`).emit('music_actualizada', { id: request.id, status });
+  res.json({ success: true, request: request.toJSON() });
+});
+
+// ── API: Music — Delete request (admin) ───────────────────────────────────
+app.delete(`${BASE}/api/e/:eventId/music/requests/:id`, requireAnyAdmin, async (req, res) => {
+  const request = await MusicRequest.findOne({ where: { id: req.params.id, event_id: req.params.eventId } });
+  if (!request) return res.status(404).json({ error: 'No encontrado' });
+  await request.destroy();
+  io.to(`event:${req.params.eventId}`).emit('music_eliminada', { id: req.params.id });
+  res.json({ success: true });
+});
+
+// ── API: Music — QR para URL de música (admin) ────────────────────────────
+app.get(`${BASE}/api/e/:eventId/music/qr`, requireAnyAdmin, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
+  const base = TUNNEL_URL || `http://${LOCAL_IP}:${PORT}`;
+  const url  = `${base}${BASE}/e/${req.params.eventId}/music`;
+  const qr   = await QRCode.toDataURL(url, { width: 300, margin: 2, color: { dark: '#000', light: '#fff' } });
+  res.json({ url, qr });
+});
+
 // ── Socket.io ─────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log(`🔌 ${socket.id}`);
@@ -318,17 +496,20 @@ io.on('connection', (socket) => {
     socket.join(`event:${eventId}`);
     socket.data.currentEventId = eventId;
 
-    const photos = await Photo.findAll({
-      where:  { event_id: eventId },
-      order:  [['timestamp', 'DESC']],
-      limit:  50,
-    });
+    const [photos, musicRequests, event] = await Promise.all([
+      Photo.findAll({ where: { event_id: eventId }, order: [['timestamp', 'DESC']], limit: 50 }),
+      MusicRequest.findAll({ where: { event_id: eventId }, order: [['requested_at', 'ASC']] }),
+      Event.findByPk(eventId),
+    ]);
+
     const ss = getSsState(eventId);
 
     socket.emit('estado_inicial', {
-      current:   null,
-      photos:    photos.map(normalize),
-      slideshow: { active: ss.active, interval: ss.interval },
+      current:        null,
+      photos:         photos.map(normalize),
+      slideshow:      { active: ss.active, interval: ss.interval },
+      musicRequests:  musicRequests.map(r => r.toJSON()),
+      musicEnabled:   event?.music_enabled ?? false,
     });
     console.log(`📌 ${socket.id} → event:${eventId}`);
   });

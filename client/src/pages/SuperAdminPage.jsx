@@ -68,8 +68,19 @@ export default function SuperAdminPage() {
     load()
   }
 
+  const toggleMusic = async (ev) => {
+    await authFetch(`${BASE}api/events/${ev.id}/music`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !ev.music_enabled }),
+    })
+    showToast(ev.music_enabled ? 'Música desactivada' : 'Música activada')
+    load()
+  }
+
   const guestUrl   = (id) => `${window.location.origin}${BASE}e/${id}/guest`
   const displayUrl = (id) => `${window.location.origin}${BASE}e/${id}/display`
+  const musicUrl   = (id) => `${window.location.origin}${BASE}e/${id}/music`
 
   return (
     <div className={s.page}>
@@ -95,6 +106,7 @@ export default function SuperAdminPage() {
               <span>Usuario op.</span>
               <span>Fotos</span>
               <span>Estado</span>
+              <span>Música</span>
               <span>Acciones</span>
             </div>
             {events.map((ev) => (
@@ -111,11 +123,21 @@ export default function SuperAdminPage() {
                     {ev.active ? 'Activo' : 'Inactivo'}
                   </button>
                 </span>
+                <span>
+                  <button
+                    className={`${s.pill} ${ev.music_enabled ? s.pillMusic : s.pillOff}`}
+                    onClick={() => toggleMusic(ev)}
+                    title={ev.music_enabled ? 'Desactivar música premium' : 'Activar música premium'}
+                  >
+                    {ev.music_enabled ? '🎵 On' : '🎵 Off'}
+                  </button>
+                </span>
                 <span className={s.cellActions}>
                   <button className={s.btnIcon} title="Editar" onClick={() => openEdit(ev)}>✏️</button>
                   <a className={s.btnIcon} href={`${BASE}admin/${ev.id}`} target="_blank" rel="noreferrer" title="Panel admin">🎛️</a>
                   <a className={s.btnIcon} href={guestUrl(ev.id)} target="_blank" rel="noreferrer" title="Ver página invitados">📷</a>
                   <a className={s.btnIcon} href={displayUrl(ev.id)} target="_blank" rel="noreferrer" title="Ver display">📽️</a>
+                  {ev.music_enabled && <a className={s.btnIcon} href={musicUrl(ev.id)} target="_blank" rel="noreferrer" title="Ver página música">🎵</a>}
                   <button className={`${s.btnIcon} ${s.btnDel}`} title="Eliminar" onClick={() => deleteEvent(ev)}>🗑</button>
                 </span>
               </div>

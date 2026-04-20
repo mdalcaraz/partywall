@@ -131,6 +131,71 @@
   transition: width 50ms linear; z-index: 3;
 }
 
+/* ── Music overlay (now playing) ── */
+.musicOverlay {
+  position: fixed;
+  bottom: 28px; left: 28px;
+  display: flex; align-items: center; gap: 12px;
+  background: rgba(8,8,8,.82);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(0,232,144,.2);
+  border-radius: 14px;
+  padding: 10px 16px 10px 10px;
+  z-index: 4;
+  transform: translateY(20px) scale(.96);
+  opacity: 0;
+  transition: opacity .5s ease, transform .5s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: none;
+  max-width: clamp(240px, 28vw, 340px);
+}
+.musicOverlayShow {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.musicOverlayArt {
+  width: clamp(44px, 5vw, 60px);
+  height: clamp(44px, 5vw, 60px);
+  border-radius: 8px; object-fit: cover; flex-shrink: 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,.5);
+}
+.musicOverlayText { flex: 1; min-width: 0; }
+.musicOverlayLabel {
+  font-family: var(--font-body);
+  font-size: clamp(.52rem, .8vw, .62rem);
+  text-transform: uppercase; letter-spacing: .22em;
+  color: var(--gold); font-weight: 600; margin-bottom: 4px;
+}
+.musicOverlayName {
+  font-family: var(--font-body);
+  font-size: clamp(.78rem, 1.1vw, .95rem);
+  font-weight: 700; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.musicOverlayArtist {
+  font-family: var(--font-body);
+  font-size: clamp(.65rem, .9vw, .78rem);
+  color: rgba(255,255,255,.55); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Equalizer bars */
+.eqBars {
+  display: flex; align-items: flex-end; gap: 2px;
+  height: 18px; flex-shrink: 0; margin-left: 4px;
+}
+.eqBars span {
+  width: 3px; background: var(--gold); border-radius: 2px;
+  animation: eqd 0.8s ease-in-out infinite alternate;
+}
+.eqBars span:nth-child(1) { height: 55%; animation-delay: 0s; }
+.eqBars span:nth-child(2) { height: 100%; animation-delay: .12s; }
+.eqBars span:nth-child(3) { height: 40%; animation-delay: .24s; }
+.eqBars span:nth-child(4) { height: 75%; animation-delay: .36s; }
+@keyframes eqd {
+  from { transform: scaleY(.25); }
+  to   { transform: scaleY(1); }
+}
+
 /* ── Notification ── */
 .notif {
   position: fixed; top: 24px; right: 24px;

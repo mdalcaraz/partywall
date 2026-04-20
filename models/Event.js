@@ -25,6 +25,10 @@ module.exports = (sequelize, DataTypes) => {
       type:         DataTypes.BOOLEAN,
       defaultValue: true,
     },
+    music_enabled: {
+      type:         DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
   }, {
     tableName:  'events',
     underscored: true,
