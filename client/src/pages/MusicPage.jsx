@@ -25,7 +25,8 @@ export default function MusicPage() {
   const [preview, setPreview]       = useState(null) // trackId en preview
   const audioRef  = useRef(null)
   const toastRef  = useRef(null)
-  const debounceRef = useRef(null)
+  const debounceRef  = useRef(null)
+  const lastSearched = useRef('')
 
   // Load event info
   useEffect(() => {
@@ -69,16 +70,20 @@ export default function MusicPage() {
     toastRef.current = setTimeout(() => setToast(t => ({ ...t, v: false })), 2800)
   }, [])
 
-  // Spotify search with debounce
+  // Spotify search with debounce — fires 800ms after the user stops typing,
+  // and only if the trimmed query actually changed since the last search
   const doSearch = useCallback(async (q) => {
     if (q.length < 2) { setTracks([]); return }
+    if (q === lastSearched.current) return
+    lastSearched.current = q
     setSearching(true)
     try {
       const r = await fetch(`${BASE}api/e/${eventId}/music/search?q=${encodeURIComponent(q)}`)
       const d = await r.json()
+      if (!r.ok) { showToast(d.error || 'Error al buscar', 'error'); return }
       setTracks(d.tracks || [])
     } catch {
-      showToast('Error al buscar', 'error')
+      showToast('Error de conexión', 'error')
     } finally {
       setSearching(false)
     }
@@ -88,8 +93,8 @@ export default function MusicPage() {
     const v = e.target.value
     setQuery(v)
     clearTimeout(debounceRef.current)
-    if (!v.trim()) { setTracks([]); return }
-    debounceRef.current = setTimeout(() => doSearch(v.trim()), 450)
+    if (!v.trim()) { setTracks([]); lastSearched.current = ''; return }
+    debounceRef.current = setTimeout(() => doSearch(v.trim()), 800)
   }
 
   const requestTrack = async (track) => {

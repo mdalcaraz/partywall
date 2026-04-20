@@ -106,13 +106,17 @@ async function getSpotifyToken() {
   if (!clientId || !clientSecret) return null;
   const creds = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
   try {
-    const r = await fetch('https://accounts.spotify.com/api/token', {
+    const r    = await fetch('https://accounts.spotify.com/api/token', {
       method:  'POST',
       headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
       body:    'grant_type=client_credentials',
     });
-    const d = await r.json();
-    if (!d.access_token) return null;
+    const text = await r.text();
+    let d;
+    try { d = JSON.parse(text); }
+    catch { console.error('Spotify token non-JSON:', text.slice(0, 120)); return null; }
+
+    if (!d.access_token) { console.error('Spotify token error:', d); return null; }
     _spotifyTok = { value: d.access_token, expiresAt: Date.now() + d.expires_in * 1000 };
     return d.access_token;
   } catch (err) {
@@ -361,9 +365,23 @@ app.get(`${BASE}/api/e/:eventId/music/search`, async (req, res) => {
   if (!token) return res.status(503).json({ error: 'Servicio de música no configurado' });
 
   try {
-    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10&market=AR`;
-    const r   = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    const d   = await r.json();
+    const url  = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10`;
+    const r    = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const text = await r.text();
+
+    let d;
+    try { d = JSON.parse(text); }
+    catch {
+      console.error(`Spotify search non-JSON [${r.status}]:`, text.slice(0, 120));
+      // Token may have been invalidated externally — clear cache so next request retries
+      _spotifyTok = { value: null, expiresAt: 0 };
+      return res.status(502).json({ error: 'Error en servicio de música, reintentá en un momento' });
+    }
+
+    if (!r.ok) {
+      console.error(`Spotify search error [${r.status}]:`, d);
+      return res.status(502).json({ error: d.error?.message || 'Error al buscar en Spotify' });
+    }
 
     const tracks = (d.tracks?.items || []).map(t => ({
       id:         t.id,
