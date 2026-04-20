@@ -6,16 +6,11 @@ import s from './SuperAdminPage.module.css'
 const BASE = import.meta.env.BASE_URL
 
 const emptyForm = {
-  // Evento
   name: '', date: '',
-  // Lugar
   location: '', address: '',
-  // Operario
   opUser: '', opPass: '',
-  // Límites
   photoLimit: 3, photoWindow: 60,
   musicLimit: 10, musicWindow: 600,
-  // Marca
   brandName: '', brandLogoUrl: '', brandInstagram: '',
 }
 
@@ -28,12 +23,12 @@ function formatDateAR(dateStr) {
 
 export default function SuperAdminPage() {
   const navigate = useNavigate()
-  const [events, setEvents]     = useState([])
-  const [form, setForm]         = useState(emptyForm)
-  const [editId, setEditId]     = useState(null)
-  const [showForm, setShowForm] = useState(false)
-  const [loading, setLoading]   = useState(false)
-  const [toast, setToast]       = useState({ msg: '', err: false, v: false })
+  const [events, setEvents]   = useState([])
+  const [form, setForm]       = useState(emptyForm)
+  const [editId, setEditId]   = useState(null)
+  const [view, setView]       = useState('list') // 'list' | 'form'
+  const [loading, setLoading] = useState(false)
+  const [toast, setToast]     = useState({ msg: '', err: false, v: false })
   let toastTimer = null
 
   const logout = () => { clearToken(); navigate('/login', { replace: true }) }
@@ -52,10 +47,10 @@ export default function SuperAdminPage() {
     toastTimer = setTimeout(() => setToast(t => ({ ...t, v: false })), 2800)
   }
 
-  const set = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.value }))
+  const set    = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.value }))
   const setNum = (key) => (e) => setForm(f => ({ ...f, [key]: Number(e.target.value) }))
 
-  const openCreate = () => { setForm(emptyForm); setEditId(null); setShowForm(true) }
+  const openCreate = () => { setForm(emptyForm); setEditId(null); setView('form') }
   const openEdit   = (ev) => {
     setForm({
       name:           ev.name           || '',
@@ -73,9 +68,9 @@ export default function SuperAdminPage() {
       brandInstagram: ev.brand_instagram|| '',
     })
     setEditId(ev.id)
-    setShowForm(true)
+    setView('form')
   }
-  const closeForm = () => { setShowForm(false); setEditId(null); setForm(emptyForm) }
+  const closeForm = () => { setView('list'); setEditId(null); setForm(emptyForm) }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -136,72 +131,84 @@ export default function SuperAdminPage() {
 
   return (
     <div className={s.page}>
+      {/* ── Topbar ── */}
       <div className={s.topbar}>
         <img src={`${BASE}logo.png`} alt="Top DJ Group" className={s.logo} />
         <div className={s.title}>Super Admin</div>
         <div className={s.spacer} />
-        <button className={s.btnNew} onClick={openCreate}>+ Nuevo evento</button>
+        {view === 'list' ? (
+          <button className={s.btnNew} onClick={openCreate}>+ Nuevo evento</button>
+        ) : (
+          <button className={s.btnBack} onClick={closeForm}>← Volver</button>
+        )}
         <button className={s.btnLogout} onClick={logout}>⎋ Salir</button>
       </div>
 
-      <div className={s.content}>
-        {events.length === 0 ? (
-          <div className={s.empty}>
-            <div className={s.emptyIcon}>🎉</div>
-            <p>No hay eventos aún. Creá el primero.</p>
-          </div>
-        ) : (
-          <div className={s.table}>
-            <div className={s.thead}>
-              <span>Evento</span>
-              <span>Fecha</span>
-              <span>Operario</span>
-              <span>Fotos</span>
-              <span>Estado</span>
-              <span>Música</span>
-              <span>Acciones</span>
+      {/* ── LIST VIEW ── */}
+      {view === 'list' && (
+        <div className={s.content}>
+          {events.length === 0 ? (
+            <div className={s.empty}>
+              <div className={s.emptyIcon}>🎉</div>
+              <p>No hay eventos aún. Creá el primero.</p>
             </div>
-            {events.map((ev) => (
-              <div key={ev.id} className={`${s.row} ${ev.active ? s.rowActive : s.rowInactive}`}>
-                <span className={s.cellName}>
-                  {ev.name}
-                  {ev.location && <span className={s.cellSub}>{ev.location}</span>}
-                </span>
-                <span className={s.cellDate}>{formatDateAR(ev.date)}</span>
-                <span className={s.cellUser}>{ev.op_user}</span>
-                <span className={s.cellCount}>{ev.photo_count ?? 0}</span>
-                <span>
-                  <button className={`${s.pill} ${ev.active ? s.pillOn : s.pillOff}`} onClick={() => toggleActive(ev)}>
-                    {ev.active ? 'Activo' : 'Inactivo'}
-                  </button>
-                </span>
-                <span>
-                  <button
-                    className={`${s.pill} ${ev.music_enabled ? s.pillMusic : s.pillOff}`}
-                    onClick={() => toggleMusic(ev)}
-                    title={ev.music_enabled ? 'Desactivar música' : 'Activar música'}
-                  >
-                    {ev.music_enabled ? '🎵 On' : '🎵 Off'}
-                  </button>
-                </span>
-                <span className={s.cellActions}>
-                  <button className={s.btnIcon} title="Editar" onClick={() => openEdit(ev)}>✏️</button>
-                  <a className={s.btnIcon} href={`${BASE}admin/${ev.id}`} target="_blank" rel="noreferrer" title="Panel admin">🎛️</a>
-                  <a className={s.btnIcon} href={guestUrl(ev.id)} target="_blank" rel="noreferrer" title="Fotos">📷</a>
-                  <a className={s.btnIcon} href={displayUrl(ev.id)} target="_blank" rel="noreferrer" title="Display">📽️</a>
-                  {ev.music_enabled && <a className={s.btnIcon} href={musicUrl(ev.id)} target="_blank" rel="noreferrer" title="Música">🎵</a>}
-                  <button className={`${s.btnIcon} ${s.btnDel}`} title="Eliminar" onClick={() => deleteEvent(ev)}>🗑</button>
-                </span>
+          ) : (
+            <div className={s.table}>
+              <div className={s.thead}>
+                <span>Evento</span>
+                <span>Fecha</span>
+                <span>Operario</span>
+                <span>Fotos</span>
+                <span>Estado</span>
+                <span>Música</span>
+                <span>Acciones</span>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              {events.map((ev) => (
+                <div key={ev.id} className={`${s.row} ${ev.active ? s.rowActive : s.rowInactive}`}>
+                  <span className={s.cellName}>
+                    {ev.name}
+                    {ev.location && <span className={s.cellSub}>{ev.location}</span>}
+                  </span>
+                  <span className={s.cellDate}>{formatDateAR(ev.date)}</span>
+                  <span className={s.cellUser}>{ev.op_user}</span>
+                  <span className={s.cellCount}>{ev.photo_count ?? 0}</span>
+                  <span>
+                    <button className={`${s.pill} ${ev.active ? s.pillOn : s.pillOff}`} onClick={() => toggleActive(ev)}>
+                      {ev.active ? 'Activo' : 'Inactivo'}
+                    </button>
+                  </span>
+                  <span>
+                    <button
+                      className={`${s.pill} ${ev.music_enabled ? s.pillMusic : s.pillOff}`}
+                      onClick={() => toggleMusic(ev)}
+                      title={ev.music_enabled ? 'Desactivar música' : 'Activar música'}
+                    >
+                      {ev.music_enabled ? '🎵 On' : '🎵 Off'}
+                    </button>
+                  </span>
+                  <span className={s.cellActions}>
+                    <button className={s.btnIcon} title="Editar" onClick={() => openEdit(ev)}>✏️</button>
+                    <a className={s.btnIcon} href={`${BASE}admin/${ev.id}`} target="_blank" rel="noreferrer" title="Panel admin">🎛️</a>
+                    <a className={s.btnIcon} href={guestUrl(ev.id)} target="_blank" rel="noreferrer" title="Fotos">📷</a>
+                    <a className={s.btnIcon} href={displayUrl(ev.id)} target="_blank" rel="noreferrer" title="Display">📽️</a>
+                    {ev.music_enabled && <a className={s.btnIcon} href={musicUrl(ev.id)} target="_blank" rel="noreferrer" title="Música">🎵</a>}
+                    <button className={`${s.btnIcon} ${s.btnDel}`} title="Eliminar" onClick={() => deleteEvent(ev)}>🗑</button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      {showForm && (
-        <div className={s.overlay} onClick={(e) => e.target === e.currentTarget && closeForm()}>
-          <div className={s.modal}>
-            <div className={s.modalTitle}>{editId ? 'Editar evento' : 'Nuevo evento'}</div>
+      {/* ── FORM VIEW ── */}
+      {view === 'form' && (
+        <div className={s.formPage}>
+          <div className={s.formWrap}>
+            <div className={s.formPageTitle}>
+              {editId ? 'Editar evento' : 'Nuevo evento'}
+            </div>
+
             <form onSubmit={submit} className={s.form}>
 
               {/* ── Evento ── */}
@@ -292,7 +299,7 @@ export default function SuperAdminPage() {
                 </div>
               )}
 
-              <div className={s.modalActions}>
+              <div className={s.formActions}>
                 <button type="button" className={s.btnCancel} onClick={closeForm}>Cancelar</button>
                 <button type="submit" className={s.btnSubmit} disabled={loading}>{loading ? 'Guardando…' : 'Guardar'}</button>
               </div>

@@ -147,35 +147,38 @@
 .btnIcon:hover { background: rgba(255,255,255,0.08); }
 .btnDel:hover  { background: rgba(220,60,60,0.15); }
 
-/* Modal */
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.65);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  padding: 16px;
-}
-
-.modal {
-  background: var(--surface);
+/* ── Back button ── */
+.btnBack {
+  background: transparent;
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 28px;
-  width: 100%;
-  max-width: 580px;
-  max-height: 90vh;
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btnBack:hover { border-color: var(--gold); color: var(--gold); }
+
+/* ── Full-page form view ── */
+.formPage {
+  flex: 1;
   overflow-y: auto;
+  padding: 40px 24px 60px;
 }
 
-.modalTitle {
+.formWrap {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.formPageTitle {
   font-family: var(--font-impact);
-  font-size: 1.2rem;
-  letter-spacing: 0.06em;
+  font-size: 1.6rem;
+  letter-spacing: 0.08em;
   color: var(--gold);
-  margin-bottom: 20px;
+  margin-bottom: 28px;
 }
 
 .form { display: flex; flex-direction: column; gap: 12px; }
@@ -225,7 +228,7 @@
 }
 .input:focus { outline: none; border-color: var(--gold); }
 
-.modalActions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+.formActions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
 
 .btnCancel {
   background: transparent;
