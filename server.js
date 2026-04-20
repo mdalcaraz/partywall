@@ -158,18 +158,20 @@ const upload = multer({
   }
 });
 
-// ── Rate limiting ─────────────────────────────────────────────────────────
+// ── Rate limiting (dinámico por evento) ──────────────────────────────────
 const uploadLimits = new Map();
-const RL_MAX = 3, RL_WINDOW = 60 * 1000;
+const musicLimits  = new Map();
 
-function checkUploadLimit(req) {
+function checkUploadLimit(req, event) {
+  const maxPhotos  = event.photo_limit  || 3;
+  const windowMs   = (event.photo_window || 60) * 1000;
   const ip    = req.headers['cf-connecting-ip'] || req.ip;
   const key   = `${req.params.eventId}:${ip}`;
   const now   = Date.now();
   const entry = uploadLimits.get(key) || { timestamps: [] };
-  entry.timestamps = entry.timestamps.filter(t => now - t < RL_WINDOW);
-  if (entry.timestamps.length >= RL_MAX) {
-    const retryAfter = Math.ceil((entry.timestamps[0] + RL_WINDOW - now) / 1000);
+  entry.timestamps = entry.timestamps.filter(t => now - t < windowMs);
+  if (entry.timestamps.length >= maxPhotos) {
+    const retryAfter = Math.ceil((entry.timestamps[0] + windowMs - now) / 1000);
     uploadLimits.set(key, entry);
     return { allowed: false, retryAfter };
   }
@@ -178,16 +180,15 @@ function checkUploadLimit(req) {
   return { allowed: true };
 }
 
-const musicLimits = new Map();
-const ML_MAX = 10, ML_WINDOW = 10 * 60 * 1000;
-
-function checkMusicLimit(req) {
+function checkMusicLimit(req, event) {
+  const maxReqs  = event.music_limit  || 10;
+  const windowMs = (event.music_window || 600) * 1000;
   const ip    = req.headers['cf-connecting-ip'] || req.ip;
   const key   = `music:${req.params.eventId}:${ip}`;
   const now   = Date.now();
   const entry = musicLimits.get(key) || { timestamps: [] };
-  entry.timestamps = entry.timestamps.filter(t => now - t < ML_WINDOW);
-  if (entry.timestamps.length >= ML_MAX) {
+  entry.timestamps = entry.timestamps.filter(t => now - t < windowMs);
+  if (entry.timestamps.length >= maxReqs) {
     musicLimits.set(key, entry);
     return { allowed: false };
   }
@@ -232,7 +233,10 @@ app.get(`${BASE}/api/events`, requireSuperAdmin, async (req, res) => {
 });
 
 app.post(`${BASE}/api/events`, requireSuperAdmin, async (req, res) => {
-  const { name, date, opUser, opPass } = req.body;
+  const { name, date, opUser, opPass,
+          location, address,
+          photoLimit, photoWindow, musicLimit, musicWindow,
+          brandName, brandLogoUrl, brandInstagram } = req.body;
   if (!name || !opUser || !opPass)
     return res.status(400).json({ error: 'Faltan campos: name, opUser, opPass' });
 
@@ -240,7 +244,18 @@ app.post(`${BASE}/api/events`, requireSuperAdmin, async (req, res) => {
   const hashedPass = bcrypt.hashSync(opPass, 10);
 
   try {
-    await Event.create({ id, name, date: date || null, op_user: opUser, op_pass: hashedPass });
+    await Event.create({
+      id, name, date: date || null, op_user: opUser, op_pass: hashedPass,
+      location:        location        || null,
+      address:         address         || null,
+      photo_limit:     photoLimit      ?? 3,
+      photo_window:    photoWindow     ?? 60,
+      music_limit:     musicLimit      ?? 10,
+      music_window:    musicWindow     ?? 600,
+      brand_name:      brandName       || 'Top DJ Group',
+      brand_logo_url:  brandLogoUrl    || null,
+      brand_instagram: brandInstagram  || 'topdjgroup',
+    });
     const event = await Event.findByPk(id);
     res.json({ success: true, event: event.toJSON() });
   } catch (e) {
@@ -252,12 +267,24 @@ app.post(`${BASE}/api/events`, requireSuperAdmin, async (req, res) => {
 });
 
 app.patch(`${BASE}/api/events/:id`, requireSuperAdmin, async (req, res) => {
-  const { name, date, opUser, opPass } = req.body;
+  const { name, date, opUser, opPass,
+          location, address,
+          photoLimit, photoWindow, musicLimit, musicWindow,
+          brandName, brandLogoUrl, brandInstagram } = req.body;
   const updates = {};
-  if (name)   updates.name    = name;
-  if (date)   updates.date    = date;
-  if (opUser) updates.op_user = opUser;
-  if (opPass) updates.op_pass = bcrypt.hashSync(opPass, 10);
+  if (name            !== undefined) updates.name            = name;
+  if (date            !== undefined) updates.date            = date || null;
+  if (opUser)                        updates.op_user         = opUser;
+  if (opPass)                        updates.op_pass         = bcrypt.hashSync(opPass, 10);
+  if (location        !== undefined) updates.location        = location        || null;
+  if (address         !== undefined) updates.address         = address         || null;
+  if (photoLimit      !== undefined) updates.photo_limit     = photoLimit;
+  if (photoWindow     !== undefined) updates.photo_window    = photoWindow;
+  if (musicLimit      !== undefined) updates.music_limit     = musicLimit;
+  if (musicWindow     !== undefined) updates.music_window    = musicWindow;
+  if (brandName       !== undefined) updates.brand_name      = brandName       || 'Top DJ Group';
+  if (brandLogoUrl    !== undefined) updates.brand_logo_url  = brandLogoUrl    || null;
+  if (brandInstagram  !== undefined) updates.brand_instagram = brandInstagram  || 'topdjgroup';
 
   try {
     await Event.update(updates, { where: { id: req.params.id } });
@@ -334,7 +361,7 @@ app.post(`${BASE}/api/e/:eventId/upload`, upload.single('photo'), async (req, re
     return res.status(404).json({ error: 'Evento no encontrado o inactivo' });
   }
 
-  const limit = checkUploadLimit(req);
+  const limit = checkUploadLimit(req, event);
   if (!limit.allowed) {
     try { fs.unlinkSync(req.file.path); } catch {}
     return res.status(429).json({ error: 'Límite alcanzado', retryAfter: limit.retryAfter });
@@ -393,6 +420,9 @@ app.get(`${BASE}/api/e/:eventId/music/search`, async (req, res) => {
       durationMs: t.duration_ms,
     }));
 
+    const withPreview = tracks.filter(t => t.previewUrl).length;
+    console.log(`🔍 [${req.params.eventId}] "${q}" → ${tracks.length} tracks, ${withPreview} con preview`);
+
     res.json({ tracks });
   } catch (err) {
     console.error('Spotify search error:', err.message);
@@ -405,9 +435,15 @@ app.get(`${BASE}/api/e/:eventId/music/info`, async (req, res) => {
   const event = await Event.findByPk(req.params.eventId);
   if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
   res.json({
-    name:          event.name,
-    active:        event.active,
-    music_enabled: event.music_enabled,
+    name:             event.name,
+    date:             event.date         || null,
+    location:         event.location     || null,
+    address:          event.address      || null,
+    active:           event.active,
+    music_enabled:    event.music_enabled,
+    brand_name:       event.brand_name      || 'Top DJ Group',
+    brand_logo_url:   event.brand_logo_url  || null,
+    brand_instagram:  event.brand_instagram || 'topdjgroup',
   });
 });
 
@@ -417,7 +453,7 @@ app.post(`${BASE}/api/e/:eventId/music/requests`, async (req, res) => {
   if (!event || !event.active)  return res.status(404).json({ error: 'Evento no encontrado' });
   if (!event.music_enabled)     return res.status(403).json({ error: 'Música no disponible' });
 
-  const limit = checkMusicLimit(req);
+  const limit = checkMusicLimit(req, event);
   if (!limit.allowed) return res.status(429).json({ error: 'Demasiados pedidos, esperá un momento' });
 
   const { trackId, trackName, artistName, albumName, albumArt, previewUrl } = req.body;

@@ -84,7 +84,7 @@
 
 .thead {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 0.6fr 0.7fr 1.2fr;
+  grid-template-columns: 2fr 1fr 1fr 0.5fr 0.7fr 0.7fr 1.4fr;
   gap: 12px;
   padding: 10px 16px;
   background: var(--surface);
@@ -96,7 +96,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 0.6fr 0.7fr 1.2fr;
+  grid-template-columns: 2fr 1fr 1fr 0.5fr 0.7fr 0.7fr 1.4fr;
   gap: 12px;
   padding: 14px 16px;
   background: var(--surface);
@@ -107,7 +107,8 @@
 .row:hover { background: var(--card-hover); }
 .rowInactive { opacity: 0.55; }
 
-.cellName { font-weight: 600; font-size: 0.95rem; }
+.cellName { font-weight: 600; font-size: 0.95rem; display: flex; flex-direction: column; gap: 2px; }
+.cellSub  { font-size: 0.75rem; color: var(--muted); font-weight: 400; }
 .cellDate, .cellUser { font-size: 0.85rem; color: var(--muted); }
 .cellCount {
   font-size: 0.85rem;
@@ -164,7 +165,9 @@
   border-radius: 14px;
   padding: 28px;
   width: 100%;
-  max-width: 420px;
+  max-width: 580px;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .modalTitle {
@@ -176,6 +179,35 @@
 }
 
 .form { display: flex; flex-direction: column; gap: 12px; }
+
+.formSection {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--gold);
+  font-weight: 700;
+  padding: 6px 0 2px;
+  border-bottom: 1px solid rgba(0,232,144,0.15);
+  margin-top: 4px;
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.logoPreview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.logoPreview img { height: 36px; object-fit: contain; }
+.logoPreview span { font-size: 0.75rem; color: var(--muted); }
 
 .label { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
 

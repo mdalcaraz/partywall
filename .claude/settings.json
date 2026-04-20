@@ -61,10 +61,13 @@
       "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"sudo pm2 startup systemd -u root --hp /root 2>&1\")",
       "Bash(ssh -o StrictHostKeyChecking=no mdalcaraz@66.94.108.215 \"sudo pm2 save && echo 'PM2 saved'\")",
       "Bash(git checkout *)",
-      "Bash(npx sequelize-cli *)"
+      "Bash(npx sequelize-cli *)",
+      "Bash(git reset *)",
+      "Bash(git fsck *)"
     ],
     "additionalDirectories": [
-      "F:\\partywall"
+      "F:\\partywall",
+      "f:\\partywall\\.git\\refs\\heads\\feature"
     ]
   }
 }

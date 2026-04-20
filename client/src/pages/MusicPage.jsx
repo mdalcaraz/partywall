@@ -3,9 +3,7 @@ import { useParams } from 'react-router-dom'
 import { getSocket } from '../lib/socket'
 import s from './MusicPage.module.css'
 
-const BASE     = import.meta.env.BASE_URL
-const IG_URL   = 'https://www.instagram.com/topdjgroup'
-const IG_HANDLE = '@topdjgroup'
+const BASE = import.meta.env.BASE_URL
 
 function msToMin(ms) {
   const m   = Math.floor(ms / 60000)
@@ -26,6 +24,8 @@ export default function MusicPage() {
 
   const [eventName, setEventName]       = useState('')
   const [available, setAvailable]       = useState(null)
+  const [brandLogo, setBrandLogo]       = useState('')
+  const [brandIg, setBrandIg]           = useState('topdjgroup')
   const [query, setQuery]               = useState('')
   const [tracks, setTracks]             = useState([])
   const [searching, setSearching]       = useState(false)
@@ -46,6 +46,8 @@ export default function MusicPage() {
       .then(d => {
         setEventName(d.name || '')
         setAvailable(!!(d.active && d.music_enabled))
+        if (d.brand_logo_url) setBrandLogo(d.brand_logo_url)
+        if (d.brand_instagram) setBrandIg(d.brand_instagram)
       })
       .catch(() => setAvailable(false))
   }, [eventId])
@@ -164,7 +166,7 @@ export default function MusicPage() {
   if (available === null) {
     return (
       <div className={s.loadingScreen}>
-        <img src={`${BASE}logo.png`} alt="Top DJ Group" className={s.loadingLogo} />
+        <img src={brandLogo || `${BASE}logo.png`} alt="logo" className={s.loadingLogo} />
         <div className={s.spinner} />
       </div>
     )
@@ -174,10 +176,10 @@ export default function MusicPage() {
   if (!available) {
     return (
       <div className={s.unavailable}>
-        <img src={`${BASE}logo.png`} alt="Top DJ Group" className={s.unavailableLogo} />
+        <img src={brandLogo || `${BASE}logo.png`} alt="logo" className={s.unavailableLogo} />
         <div className={s.unavailableTitle}>Música no disponible</div>
         <div className={s.unavailableSub}>Este evento no tiene la función de pedidos activada.</div>
-        <a href={IG_URL} target="_blank" rel="noreferrer" className={s.igBtnStandalone}>
+        <a href={`https://www.instagram.com/${brandIg}`} target="_blank" rel="noreferrer" className={s.igBtnStandalone}>
           <IgIcon /> Seguinos en Instagram
         </a>
       </div>
@@ -192,7 +194,7 @@ export default function MusicPage() {
       {/* ── Hero header ── */}
       <div className={s.hero}>
         <div className={s.heroBg} />
-        <img src={`${BASE}logo.png`} alt="Top DJ Group" className={s.heroLogo} />
+        <img src={brandLogo || `${BASE}logo.png`} alt="logo" className={s.heroLogo} />
         <div className={s.heroTagline}>Pedí tu tema</div>
         {eventName && <div className={s.heroEvent}>{eventName}</div>}
       </div>
@@ -334,9 +336,9 @@ export default function MusicPage() {
       {/* ── Instagram sticky footer ── */}
       <div className={s.igFooter}>
         <span className={s.igFooterText}>¿Te gustó la noche?</span>
-        <a href={IG_URL} target="_blank" rel="noreferrer" className={s.igBtn}>
+        <a href={`https://www.instagram.com/${brandIg}`} target="_blank" rel="noreferrer" className={s.igBtn}>
           <IgIcon />
-          Seguinos {IG_HANDLE}
+          Seguinos @{brandIg}
         </a>
       </div>
 
