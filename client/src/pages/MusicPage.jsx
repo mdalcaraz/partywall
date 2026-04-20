@@ -3,34 +3,43 @@ import { useParams } from 'react-router-dom'
 import { getSocket } from '../lib/socket'
 import s from './MusicPage.module.css'
 
-const BASE = import.meta.env.BASE_URL
+const BASE     = import.meta.env.BASE_URL
+const IG_URL   = 'https://www.instagram.com/topdjgroup'
+const IG_HANDLE = '@topdjgroup'
 
 function msToMin(ms) {
-  const m = Math.floor(ms / 60000)
+  const m   = Math.floor(ms / 60000)
   const sec = Math.floor((ms % 60000) / 1000).toString().padStart(2, '0')
   return `${m}:${sec}`
+}
+
+function IgIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden>
+      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+    </svg>
+  )
 }
 
 export default function MusicPage() {
   const { eventId } = useParams()
 
-  const [eventName, setEventName]   = useState('')
-  const [available, setAvailable]   = useState(null) // null=loading, true/false
-  const [query, setQuery]           = useState('')
-  const [tracks, setTracks]         = useState([])
-  const [searching, setSearching]   = useState(false)
-  const [requests, setRequests]     = useState([])
-  const [requested, setRequested]   = useState(new Set()) // trackIds ya pedidos
-  const [toast, setToast]           = useState({ msg: '', type: '', v: false })
-  const [preview, setPreview]         = useState(null)   // trackId en preview
-  const [previewProgress, setProgress] = useState(0)      // 0-100
+  const [eventName, setEventName]       = useState('')
+  const [available, setAvailable]       = useState(null)
+  const [query, setQuery]               = useState('')
+  const [tracks, setTracks]             = useState([])
+  const [searching, setSearching]       = useState(false)
+  const [requests, setRequests]         = useState([])
+  const [requested, setRequested]       = useState(new Set())
+  const [toast, setToast]               = useState({ msg: '', type: '', v: false })
+  const [preview, setPreview]           = useState(null)
+  const [previewProgress, setProgress]  = useState(0)
   const audioRef     = useRef(null)
   const progressRef  = useRef(null)
   const toastRef     = useRef(null)
   const debounceRef  = useRef(null)
   const lastSearched = useRef('')
 
-  // Load event info
   useEffect(() => {
     fetch(`${BASE}api/e/${eventId}/music/info`)
       .then(r => r.json())
@@ -41,23 +50,17 @@ export default function MusicPage() {
       .catch(() => setAvailable(false))
   }, [eventId])
 
-  // Socket.io: subscribe to real-time updates
   useEffect(() => {
     if (!eventId) return
     const socket = getSocket(eventId)
-
-    const onEstado = ({ musicRequests }) => {
-      if (musicRequests) setRequests(musicRequests)
-    }
-    const onNueva      = (r)           => setRequests(prev => [...prev, r])
-    const onActualizada = ({ id, status }) => setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r))
-    const onEliminada  = ({ id })      => setRequests(prev => prev.filter(r => r.id !== id))
-
-    socket.on('estado_inicial',  onEstado)
-    socket.on('music_nueva',     onNueva)
+    const onEstado      = ({ musicRequests }) => { if (musicRequests) setRequests(musicRequests) }
+    const onNueva       = (r)                 => setRequests(prev => [...prev, r])
+    const onActualizada = ({ id, status })    => setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r))
+    const onEliminada   = ({ id })            => setRequests(prev => prev.filter(r => r.id !== id))
+    socket.on('estado_inicial',    onEstado)
+    socket.on('music_nueva',       onNueva)
     socket.on('music_actualizada', onActualizada)
-    socket.on('music_eliminada', onEliminada)
-
+    socket.on('music_eliminada',   onEliminada)
     return () => {
       socket.off('estado_inicial',    onEstado)
       socket.off('music_nueva',       onNueva)
@@ -72,8 +75,6 @@ export default function MusicPage() {
     toastRef.current = setTimeout(() => setToast(t => ({ ...t, v: false })), 2800)
   }, [])
 
-  // Spotify search with debounce — fires 800ms after the user stops typing,
-  // and only if the trimmed query actually changed since the last search
   const doSearch = useCallback(async (q) => {
     if (q.length < 2) { setTracks([]); return }
     if (q === lastSearched.current) return
@@ -104,7 +105,7 @@ export default function MusicPage() {
       const r = await fetch(`${BASE}api/e/${eventId}/music/requests`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
+        body: JSON.stringify({
           trackId:    track.id,
           trackName:  track.name,
           artistName: track.artist,
@@ -114,10 +115,7 @@ export default function MusicPage() {
         }),
       })
       const d = await r.json()
-      if (!r.ok) {
-        showToast(d.error || 'Error al pedir', 'error')
-        return
-      }
+      if (!r.ok) { showToast(d.error || 'Error al pedir', 'error'); return }
       setRequested(prev => new Set([...prev, track.id]))
       showToast(`¡Pedido! ${track.artist} — ${track.name}`, 'success')
     } catch {
@@ -125,10 +123,7 @@ export default function MusicPage() {
     }
   }
 
-  const stopProgress = () => {
-    clearInterval(progressRef.current)
-    setProgress(0)
-  }
+  const stopProgress = () => { clearInterval(progressRef.current); setProgress(0) }
 
   const startProgress = () => {
     clearInterval(progressRef.current)
@@ -144,14 +139,9 @@ export default function MusicPage() {
     if (!track.previewUrl) return
     const audio = audioRef.current
     if (!audio) return
-
     if (preview === track.id) {
-      audio.pause()
-      stopProgress()
-      setPreview(null)
-      return
+      audio.pause(); stopProgress(); setPreview(null); return
     }
-
     audio.pause()
     audio.src = track.previewUrl
     audio.load()
@@ -160,10 +150,7 @@ export default function MusicPage() {
       .catch(() => showToast('No se pudo reproducir el preview', 'error'))
   }
 
-  const onAudioEnded = () => {
-    stopProgress()
-    setPreview(null)
-  }
+  const onAudioEnded = () => { stopProgress(); setPreview(null) }
 
   const alreadyRequested = (trackId) => {
     if (requested.has(trackId)) return true
@@ -173,38 +160,44 @@ export default function MusicPage() {
   const pendingRequests = requests.filter(r => r.status === 'pending')
   const playingRequest  = requests.find(r => r.status === 'playing')
 
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (available === null) {
     return (
       <div className={s.loadingScreen}>
+        <img src={`${BASE}logo.png`} alt="Top DJ Group" className={s.loadingLogo} />
         <div className={s.spinner} />
       </div>
     )
   }
 
+  // ── Not available ─────────────────────────────────────────────────────────
   if (!available) {
     return (
       <div className={s.unavailable}>
-        <div className={s.unavailableIcon}>🎵</div>
+        <img src={`${BASE}logo.png`} alt="Top DJ Group" className={s.unavailableLogo} />
         <div className={s.unavailableTitle}>Música no disponible</div>
         <div className={s.unavailableSub}>Este evento no tiene la función de pedidos activada.</div>
+        <a href={IG_URL} target="_blank" rel="noreferrer" className={s.igBtnStandalone}>
+          <IgIcon /> Seguinos en Instagram
+        </a>
       </div>
     )
   }
 
+  // ── Main ──────────────────────────────────────────────────────────────────
   return (
     <div className={s.page}>
       <audio ref={audioRef} onEnded={onAudioEnded} />
 
-      {/* Header */}
-      <div className={s.header}>
-        <div className={s.headerIcon}>🎵</div>
-        <div className={s.headerText}>
-          <div className={s.headerTitle}>Pedí tu tema</div>
-          {eventName && <div className={s.headerSub}>{eventName}</div>}
-        </div>
+      {/* ── Hero header ── */}
+      <div className={s.hero}>
+        <div className={s.heroBg} />
+        <img src={`${BASE}logo.png`} alt="Top DJ Group" className={s.heroLogo} />
+        <div className={s.heroTagline}>Pedí tu tema</div>
+        {eventName && <div className={s.heroEvent}>{eventName}</div>}
       </div>
 
-      {/* Now playing */}
+      {/* ── Now playing ── */}
       {playingRequest && (
         <div className={s.nowPlaying}>
           {playingRequest.album_art && (
@@ -215,13 +208,11 @@ export default function MusicPage() {
             <div className={s.nowPlayingName}>{playingRequest.track_name}</div>
             <div className={s.nowPlayingArtist}>{playingRequest.artist_name}</div>
           </div>
-          <div className={s.equalizerBars}>
-            <span /><span /><span /><span />
-          </div>
+          <div className={s.equalizerBars}><span /><span /><span /><span /></div>
         </div>
       )}
 
-      {/* Search */}
+      {/* ── Search ── */}
       <div className={s.searchWrap}>
         <div className={s.searchBox}>
           <svg className={s.searchIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -244,11 +235,11 @@ export default function MusicPage() {
         </div>
       </div>
 
-      {/* Search results */}
+      {/* ── Search results ── */}
       {tracks.length > 0 && (
         <div className={s.results}>
           {tracks.map(track => {
-            const done = alreadyRequested(track.id)
+            const done        = alreadyRequested(track.id)
             const isPreviewing = preview === track.id
             return (
               <div key={track.id} className={`${s.trackCard} ${isPreviewing ? s.trackCardPreviewing : ''}`}>
@@ -267,8 +258,7 @@ export default function MusicPage() {
                       </div>
                       {isPreviewing && (
                         <svg className={s.previewRing} viewBox="0 0 54 54">
-                          <circle cx="27" cy="27" r="24"
-                            fill="none" stroke="rgba(0,232,144,0.25)" strokeWidth="3" />
+                          <circle cx="27" cy="27" r="24" fill="none" stroke="rgba(0,232,144,.2)" strokeWidth="3" />
                           <circle cx="27" cy="27" r="24"
                             fill="none" stroke="#00e890" strokeWidth="3"
                             strokeDasharray={`${2 * Math.PI * 24}`}
@@ -303,7 +293,7 @@ export default function MusicPage() {
         </div>
       )}
 
-      {/* Empty search state */}
+      {/* ── Empty search ── */}
       {query.length >= 2 && !searching && tracks.length === 0 && (
         <div className={s.emptySearch}>
           <div className={s.emptyIcon}>🔍</div>
@@ -311,7 +301,7 @@ export default function MusicPage() {
         </div>
       )}
 
-      {/* Queue */}
+      {/* ── Queue ── */}
       {pendingRequests.length > 0 && (
         <div className={s.queue}>
           <div className={s.queueTitle}>Cola de pedidos</div>
@@ -331,13 +321,24 @@ export default function MusicPage() {
         </div>
       )}
 
-      {/* Landing hint when no search */}
+      {/* ── Hint (idle state) ── */}
       {!query && tracks.length === 0 && pendingRequests.length === 0 && !playingRequest && (
         <div className={s.hint}>
           <div className={s.hintIcon}>🎶</div>
-          <div className={s.hintText}>Escribí el nombre de una canción o artista para buscar en Spotify</div>
+          <div className={s.hintText}>
+            Escribí el nombre de una canción o artista para buscar en Spotify
+          </div>
         </div>
       )}
+
+      {/* ── Instagram sticky footer ── */}
+      <div className={s.igFooter}>
+        <span className={s.igFooterText}>¿Te gustó la noche?</span>
+        <a href={IG_URL} target="_blank" rel="noreferrer" className={s.igBtn}>
+          <IgIcon />
+          Seguinos {IG_HANDLE}
+        </a>
+      </div>
 
       <div className={`${s.toast} ${toast.v ? s.toastShow : ''} ${toast.type === 'success' ? s.toastSuccess : ''} ${toast.type === 'error' ? s.toastError : ''}`}>
         {toast.msg}
