@@ -22,9 +22,11 @@ export default function MusicPage() {
   const [requests, setRequests]     = useState([])
   const [requested, setRequested]   = useState(new Set()) // trackIds ya pedidos
   const [toast, setToast]           = useState({ msg: '', type: '', v: false })
-  const [preview, setPreview]       = useState(null) // trackId en preview
-  const audioRef  = useRef(null)
-  const toastRef  = useRef(null)
+  const [preview, setPreview]         = useState(null)   // trackId en preview
+  const [previewProgress, setProgress] = useState(0)      // 0-100
+  const audioRef     = useRef(null)
+  const progressRef  = useRef(null)
+  const toastRef     = useRef(null)
   const debounceRef  = useRef(null)
   const lastSearched = useRef('')
 
@@ -123,19 +125,44 @@ export default function MusicPage() {
     }
   }
 
+  const stopProgress = () => {
+    clearInterval(progressRef.current)
+    setProgress(0)
+  }
+
+  const startProgress = () => {
+    clearInterval(progressRef.current)
+    setProgress(0)
+    const audio = audioRef.current
+    progressRef.current = setInterval(() => {
+      if (!audio || !audio.duration) return
+      setProgress((audio.currentTime / audio.duration) * 100)
+    }, 250)
+  }
+
   const togglePreview = (track) => {
     if (!track.previewUrl) return
+    const audio = audioRef.current
+    if (!audio) return
+
     if (preview === track.id) {
-      audioRef.current?.pause()
+      audio.pause()
+      stopProgress()
       setPreview(null)
       return
     }
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.src = track.previewUrl
-      audioRef.current.play().catch(() => {})
-    }
-    setPreview(track.id)
+
+    audio.pause()
+    audio.src = track.previewUrl
+    audio.load()
+    audio.play()
+      .then(() => { setPreview(track.id); startProgress() })
+      .catch(() => showToast('No se pudo reproducir el preview', 'error'))
+  }
+
+  const onAudioEnded = () => {
+    stopProgress()
+    setPreview(null)
   }
 
   const alreadyRequested = (trackId) => {
@@ -166,7 +193,7 @@ export default function MusicPage() {
 
   return (
     <div className={s.page}>
-      <audio ref={audioRef} onEnded={() => setPreview(null)} />
+      <audio ref={audioRef} onEnded={onAudioEnded} />
 
       {/* Header */}
       <div className={s.header}>
@@ -224,22 +251,44 @@ export default function MusicPage() {
             const done = alreadyRequested(track.id)
             const isPreviewing = preview === track.id
             return (
-              <div key={track.id} className={s.trackCard}>
-                <div className={s.trackArtWrap} onClick={() => togglePreview(track)}>
+              <div key={track.id} className={`${s.trackCard} ${isPreviewing ? s.trackCardPreviewing : ''}`}>
+                <div
+                  className={`${s.trackArtWrap} ${track.previewUrl ? s.trackArtHasPreview : ''}`}
+                  onClick={() => togglePreview(track)}
+                >
                   {track.albumArt
                     ? <img src={track.albumArt} alt="" className={s.trackArt} />
                     : <div className={s.trackArtPlaceholder}>🎵</div>
                   }
                   {track.previewUrl && (
-                    <div className={`${s.previewBtn} ${isPreviewing ? s.previewBtnActive : ''}`}>
-                      {isPreviewing ? '⏸' : '▶'}
-                    </div>
+                    <>
+                      <div className={`${s.previewBtn} ${isPreviewing ? s.previewBtnActive : ''}`}>
+                        {isPreviewing ? '⏸' : '▶'}
+                      </div>
+                      {isPreviewing && (
+                        <svg className={s.previewRing} viewBox="0 0 54 54">
+                          <circle cx="27" cy="27" r="24"
+                            fill="none" stroke="rgba(0,232,144,0.25)" strokeWidth="3" />
+                          <circle cx="27" cy="27" r="24"
+                            fill="none" stroke="#00e890" strokeWidth="3"
+                            strokeDasharray={`${2 * Math.PI * 24}`}
+                            strokeDashoffset={`${2 * Math.PI * 24 * (1 - previewProgress / 100)}`}
+                            strokeLinecap="round"
+                            transform="rotate(-90 27 27)"
+                            style={{ transition: 'stroke-dashoffset .25s linear' }}
+                          />
+                        </svg>
+                      )}
+                    </>
                   )}
                 </div>
                 <div className={s.trackInfo}>
                   <div className={s.trackName}>{track.name}</div>
                   <div className={s.trackArtist}>{track.artist}</div>
-                  <div className={s.trackMeta}>{track.album} · {msToMin(track.durationMs)}</div>
+                  <div className={s.trackMeta}>
+                    {track.album} · {msToMin(track.durationMs)}
+                    {track.previewUrl && !isPreviewing && <span className={s.previewHint}> · ▶ Preview</span>}
+                  </div>
                 </div>
                 <button
                   className={`${s.btnPedir} ${done ? s.btnPedirDone : ''}`}

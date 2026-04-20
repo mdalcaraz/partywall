@@ -136,10 +136,15 @@
 }
 .trackCard:active { background: var(--card); }
 
+.trackCard { transition: background .15s; }
+.trackCardPreviewing { background: rgba(0,232,144,.04) !important; }
+
 .trackArtWrap {
   position: relative; flex-shrink: 0;
-  width: 54px; height: 54px; cursor: pointer;
+  width: 54px; height: 54px;
 }
+.trackArtHasPreview { cursor: pointer; }
+
 .trackArt {
   width: 100%; height: 100%;
   border-radius: 8px; object-fit: cover; display: block;
@@ -151,17 +156,29 @@
   display: flex; align-items: center; justify-content: center;
   font-size: 1.4rem;
 }
+
+/* Preview button — always visible on mobile (no hover needed) */
 .previewBtn {
   position: absolute; inset: 0;
   border-radius: 8px;
-  background: rgba(0,0,0,.55);
+  background: rgba(0,0,0,.52);
   display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: .85rem;
-  opacity: 0; transition: opacity .2s;
+  color: #fff; font-size: .9rem;
+  transition: background .2s;
 }
-.trackArtWrap:hover .previewBtn,
-.previewBtnActive { opacity: 1; }
-.previewBtnActive { background: rgba(0,232,144,.5) !important; }
+.previewBtnActive { background: rgba(0,232,144,.35); }
+
+/* SVG ring progress around album art while previewing */
+.previewRing {
+  position: absolute; inset: -4px;
+  width: calc(100% + 8px); height: calc(100% + 8px);
+  pointer-events: none;
+}
+
+.previewHint {
+  color: rgba(0,232,144,.55);
+  font-size: .65rem;
+}
 
 .trackInfo { flex: 1; min-width: 0; }
 .trackName {
