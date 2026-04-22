@@ -120,7 +120,6 @@ export default function MusicPage() {
     try {
       const r = await fetch(`${BASE}api/e/${eventId}/music/requests`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
         headers: { 'Content-Type': 'application/json', 'X-Device-ID': getDeviceId() },
         body: JSON.stringify({
           trackId:    track.id,
