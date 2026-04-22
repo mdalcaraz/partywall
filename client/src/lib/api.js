@@ -1,4 +1,11 @@
-const TOKEN_KEY = 'auth_token';
+const TOKEN_KEY  = 'auth_token';
+const DEVICE_KEY = 'pw_device_id';
+
+export function getDeviceId() {
+  let id = localStorage.getItem(DEVICE_KEY);
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem(DEVICE_KEY, id); }
+  return id;
+}
 
 export const getToken    = ()  => localStorage.getItem(TOKEN_KEY);
 export const setToken    = (t) => localStorage.setItem(TOKEN_KEY, t);

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { getSocket } from '../lib/socket'
+import { getDeviceId } from '../lib/api'
 import s from './MusicPage.module.css'
 
 const BASE = import.meta.env.BASE_URL
@@ -120,6 +121,7 @@ export default function MusicPage() {
       const r = await fetch(`${BASE}api/e/${eventId}/music/requests`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Device-ID': getDeviceId() },
         body: JSON.stringify({
           trackId:    track.id,
           trackName:  track.name,
@@ -299,7 +301,7 @@ export default function MusicPage() {
       )}
 
       {/* ── Empty search ── */}
-      {query.length >= 2 && !searching && tracks.length === 0 && (
+      {query.length >= 2 && !searching && tracks.length === 0 && query.trim() === lastSearched.current && (
         <div className={s.emptySearch}>
           <div className={s.emptyIcon}>🔍</div>
           <div>No encontramos resultados para "{query}"</div>

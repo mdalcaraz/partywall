@@ -162,11 +162,15 @@ const upload = multer({
 const uploadLimits = new Map();
 const musicLimits  = new Map();
 
+function clientId(req) {
+  // Device ID enviado por el cliente tiene prioridad sobre IP
+  return req.headers['x-device-id'] || req.headers['cf-connecting-ip'] || req.ip;
+}
+
 function checkUploadLimit(req, event) {
   const maxPhotos  = event.photo_limit  || 3;
   const windowMs   = (event.photo_window || 60) * 1000;
-  const ip    = req.headers['cf-connecting-ip'] || req.ip;
-  const key   = `${req.params.eventId}:${ip}`;
+  const key   = `${req.params.eventId}:${clientId(req)}`;
   const now   = Date.now();
   const entry = uploadLimits.get(key) || { timestamps: [] };
   entry.timestamps = entry.timestamps.filter(t => now - t < windowMs);
@@ -183,8 +187,7 @@ function checkUploadLimit(req, event) {
 function checkMusicLimit(req, event) {
   const maxReqs  = event.music_limit  || 10;
   const windowMs = (event.music_window || 600) * 1000;
-  const ip    = req.headers['cf-connecting-ip'] || req.ip;
-  const key   = `music:${req.params.eventId}:${ip}`;
+  const key   = `music:${req.params.eventId}:${clientId(req)}`;
   const now   = Date.now();
   const entry = musicLimits.get(key) || { timestamps: [] };
   entry.timestamps = entry.timestamps.filter(t => now - t < windowMs);

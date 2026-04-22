@@ -1,18 +1,19 @@
 .page {
   background: var(--bg);
   color: var(--text);
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
-  overflow-x: hidden;
 }
 
 /* ── Header ── */
 .header {
+  flex-shrink: 0;
   width: 100%;
   max-width: 480px;
-  padding: 20px 20px 0;
+  padding: 12px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -37,13 +38,18 @@
 
 /* ── Viewfinder ── */
 .viewfinderWrap {
+  flex: 1;
+  min-height: 0;
   width: 100%;
   max-width: 480px;
-  padding: 16px 20px 0;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .viewfinder {
-  width: min(80vw, 384px);
-  aspect-ratio: 9 / 16;
+  width: 100%;
+  height: 100%;
   border-radius: var(--radius);
   overflow: hidden;
   position: relative;
@@ -54,7 +60,7 @@
   position: absolute;
   inset: 0;
   width: 100%; height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
@@ -96,13 +102,14 @@
 
 /* ── Controls ── */
 .controls {
+  flex-shrink: 0;
   width: 100%;
   max-width: 480px;
-  padding: 20px 20px 16px;
+  padding: 10px 20px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 .shootRow { display: flex; align-items: center; gap: 28px; }
 
@@ -209,14 +216,14 @@
 
 /* ── Footer ── */
 .footer {
+  flex-shrink: 0;
   width: 100%;
   max-width: 480px;
-  padding: 12px 20px 24px;
+  padding: 4px 20px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  margin-top: auto;
 }
 .igLink {
   display: flex; align-items: center; gap: 5px;
