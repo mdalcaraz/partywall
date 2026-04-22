@@ -111,7 +111,7 @@ export default function AdminPage() {
   // ── Photo actions ─────────────────────────────────────────────────────────
   const project      = (photo) => { socketRef.current?.emit('proyectar', { eventId, photo }); showToast('Foto proyectada') }
   const clearDisplay = () => { socketRef.current?.emit('proyectar', { eventId, photo: null }); setCurrentId(null); showToast('Pantalla apagada') }
-  const deletePhoto  = (id) => { if (!confirm('¿Eliminar esta foto?')) return; authFetch(`${BASE}api/e/${eventId}/photos/${id}`, { method: 'DELETE' }) }
+  const deletePhoto  = (id) => { authFetch(`${BASE}api/e/${eventId}/photos/${id}`, { method: 'DELETE' }) }
   const toggleSlide  = (id) => {
     setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow: !p.inSlideshow } : p))
     authFetch(`${BASE}api/e/${eventId}/photos/${id}/slideshow`, { method: 'PATCH' })
@@ -123,7 +123,6 @@ export default function AdminPage() {
       })
   }
   const clearAll = () => {
-    if (!confirm(`¿Eliminar las ${photos.length} fotos?`)) return
     Promise.all(photos.map((p) => authFetch(`${BASE}api/e/${eventId}/photos/${p.id}`, { method: 'DELETE' }))).then(() => showToast('Fotos eliminadas'))
   }
   const toggleSlideshow = () => {
@@ -134,7 +133,6 @@ export default function AdminPage() {
 
   // ── Music actions ─────────────────────────────────────────────────────────
   const deleteRequest = async (id) => {
-    if (!confirm('¿Eliminar este pedido?')) return
     await authFetch(`${BASE}api/e/${eventId}/music/requests/${id}`, { method: 'DELETE' })
   }
 
