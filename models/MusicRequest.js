@@ -36,6 +36,10 @@ module.exports = (sequelize, DataTypes) => {
       type:         DataTypes.ENUM('pending', 'playing', 'done'),
       defaultValue: 'pending',
     },
+    votes: {
+      type:         DataTypes.INTEGER,
+      defaultValue: 0,
+    },
     requested_at: {
       type:      DataTypes.DATE,
       allowNull: false,

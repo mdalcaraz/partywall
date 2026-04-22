@@ -32,6 +32,7 @@ export default function MusicPage() {
   const [searching, setSearching]       = useState(false)
   const [requests, setRequests]         = useState([])
   const [requested, setRequested]       = useState(new Set())
+  const [voted, setVoted]               = useState(new Set())
   const [toast, setToast]               = useState({ msg: '', type: '', v: false })
   const [preview, setPreview]           = useState(null)
   const [previewProgress, setProgress]  = useState(0)
@@ -63,15 +64,18 @@ export default function MusicPage() {
     const onNueva       = (r)                 => setRequests(prev => [...prev, r])
     const onActualizada = ({ id, status })    => setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r))
     const onEliminada   = ({ id })            => setRequests(prev => prev.filter(r => r.id !== id))
+    const onVote        = ({ id, votes })     => setRequests(prev => prev.map(r => r.id === id ? { ...r, votes } : r))
     socket.on('estado_inicial',    onEstado)
     socket.on('music_nueva',       onNueva)
     socket.on('music_actualizada', onActualizada)
     socket.on('music_eliminada',   onEliminada)
+    socket.on('music_vote',        onVote)
     return () => {
       socket.off('estado_inicial',    onEstado)
       socket.off('music_nueva',       onNueva)
       socket.off('music_actualizada', onActualizada)
       socket.off('music_eliminada',   onEliminada)
+      socket.off('music_vote',        onVote)
     }
   }, [eventId])
 
@@ -171,9 +175,27 @@ export default function MusicPage() {
 
   const onAudioEnded = () => { stopProgress(); setPreview(null) }
 
-  const alreadyRequested = (trackId) => {
-    if (requested.has(trackId)) return true
-    return requests.some(r => r.track_id === trackId && (r.status === 'pending' || r.status === 'playing'))
+  const getTrackState = (trackId) => {
+    const iMine      = requested.has(trackId)
+    const queueEntry = requests.find(r => r.track_id === trackId && (r.status === 'pending' || r.status === 'playing'))
+    const inQueue    = !!queueEntry
+    const hasVoted   = queueEntry ? voted.has(queueEntry.id) : false
+    return { iMine, inQueue, queueEntry, hasVoted }
+  }
+
+  const voteTrack = async (request) => {
+    try {
+      const r = await fetch(`${BASE}api/e/${eventId}/music/requests/${request.id}/vote`, {
+        method: 'POST',
+        headers: { 'X-Device-ID': getDeviceId() },
+      })
+      const d = await r.json()
+      if (!r.ok) { showToast(d.error || 'Error al impulsar', 'error'); return }
+      setVoted(prev => new Set([...prev, request.id]))
+      showToast('¡Impulsado! 🔥', 'success')
+    } catch {
+      showToast('Error de conexión', 'error')
+    }
   }
 
   // ── Loading ──────────────────────────────────────────────────────────────
@@ -248,7 +270,7 @@ export default function MusicPage() {
       {tracks.length > 0 && (
         <div className={s.results}>
           {tracks.map(track => {
-            const done        = alreadyRequested(track.id)
+            const { iMine, inQueue, queueEntry, hasVoted } = getTrackState(track.id)
             const isPreviewing = preview === track.id
             return (
               <div key={track.id} className={`${s.trackCard} ${isPreviewing ? s.trackCardPreviewing : ''}`}>
@@ -288,13 +310,22 @@ export default function MusicPage() {
                     {track.album} · {msToMin(track.durationMs)}
                   </div>
                 </div>
-                <button
-                  className={`${s.btnPedir} ${done || cooldown > 0 ? s.btnPedirDone : ''} ${cooldown > 0 && !done ? s.btnPedirCooldown : ''}`}
-                  onClick={() => !done && !cooldown && requestTrack(track)}
-                  disabled={done || cooldown > 0}
-                >
-                  {done ? '✓' : cooldown > 0 ? `${cooldown}s` : 'Pedir'}
-                </button>
+
+                {iMine ? (
+                  <button className={`${s.btnPedir} ${s.btnPedirDone}`} disabled>✓</button>
+                ) : inQueue && !hasVoted ? (
+                  <button className={s.btnImpulsar} onClick={() => voteTrack(queueEntry)}>
+                    🔥 {queueEntry.votes > 0 ? queueEntry.votes : 'Impulsar'}
+                  </button>
+                ) : inQueue && hasVoted ? (
+                  <button className={`${s.btnImpulsar} ${s.btnImpulsarDone}`} disabled>
+                    🔥 {queueEntry.votes}
+                  </button>
+                ) : cooldown > 0 ? (
+                  <button className={`${s.btnPedir} ${s.btnPedirCooldown}`} disabled>{cooldown}s</button>
+                ) : (
+                  <button className={s.btnPedir} onClick={() => requestTrack(track)}>Pedir</button>
+                )}
               </div>
             )
           })}

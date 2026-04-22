@@ -161,6 +161,7 @@ const upload = multer({
 // ── Rate limiting (dinámico por evento) ──────────────────────────────────
 const uploadLimits = new Map();
 const musicLimits  = new Map();
+const voteTracker  = new Map(); // requestId -> Set<deviceId>
 
 function clientId(req) {
   // Device ID enviado por el cliente tiene prioridad sobre IP
@@ -553,9 +554,30 @@ app.patch(`${BASE}/api/e/:eventId/music/requests/:id`, requireAnyAdmin, async (r
 app.delete(`${BASE}/api/e/:eventId/music/requests/:id`, requireAnyAdmin, async (req, res) => {
   const request = await MusicRequest.findOne({ where: { id: req.params.id, event_id: req.params.eventId } });
   if (!request) return res.status(404).json({ error: 'No encontrado' });
+  voteTracker.delete(req.params.id);
   await request.destroy();
   io.to(`event:${req.params.eventId}`).emit('music_eliminada', { id: req.params.id });
   res.json({ success: true });
+});
+
+// ── API: Music — Vote / impulsar (public) ─────────────────────────────────
+app.post(`${BASE}/api/e/:eventId/music/requests/:id/vote`, async (req, res) => {
+  const device = clientId(req);
+  const voters = voteTracker.get(req.params.id) || new Set();
+  if (voters.has(device)) return res.status(409).json({ error: 'Ya impulsaste este tema' });
+
+  const request = await MusicRequest.findOne({ where: { id: req.params.id, event_id: req.params.eventId } });
+  if (!request) return res.status(404).json({ error: 'No encontrado' });
+  if (!['pending', 'playing'].includes(request.status)) return res.status(400).json({ error: 'No se puede impulsar' });
+
+  voters.add(device);
+  voteTracker.set(req.params.id, voters);
+
+  await request.increment('votes');
+  const votes = request.votes + 1;
+  io.to(`event:${req.params.eventId}`).emit('music_vote', { id: req.params.id, votes });
+  console.log(`🔥 [${req.params.eventId}] vote → ${request.track_name} (${votes})`);
+  res.json({ success: true, votes });
 });
 
 // ── API: Music — QR para URL de música (admin) ────────────────────────────

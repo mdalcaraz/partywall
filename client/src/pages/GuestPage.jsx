@@ -270,6 +270,16 @@ export default function GuestPage() {
             <button className={`${s.btn} ${s.btnSecondary}`} onClick={resetToCamera} disabled={isBusy}>
               ↩ Repetir
             </button>
+            {previewUrl && (
+              <a
+                href={previewUrl}
+                download={`foto_${Date.now()}.jpg`}
+                className={`${s.btn} ${s.btnSecondary}`}
+                style={{ textDecoration: 'none' }}
+              >
+                ↓ Guardar
+              </a>
+            )}
             <button className={`${s.btn} ${s.btnPrimary}`} onClick={sendPhoto} disabled={isBusy}>
               {mode === 'sending' ? 'Enviando...' : '✉ Enviar'}
             </button>

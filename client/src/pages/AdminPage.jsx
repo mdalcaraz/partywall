@@ -65,6 +65,7 @@ export default function AdminPage() {
     const onMusicActualizada = ({ id, status })  => setMusicRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r))
     const onMusicEliminada   = ({ id })          => setMusicRequests(prev => prev.filter(r => r.id !== id))
     const onMusicCleared     = ()                => setMusicRequests(prev => prev.map(r => r.status === 'playing' ? { ...r, status: 'pending' } : r))
+    const onMusicVote        = ({ id, votes })   => setMusicRequests(prev => prev.map(r => r.id === id ? { ...r, votes } : r))
 
     setConnected(socket.connected)
     socket.on('connect',               onConnect)
@@ -79,6 +80,7 @@ export default function AdminPage() {
     socket.on('music_actualizada',     onMusicActualizada)
     socket.on('music_eliminada',       onMusicEliminada)
     socket.on('music_playing_cleared', onMusicCleared)
+    socket.on('music_vote',            onMusicVote)
 
     return () => {
       socket.off('connect',               onConnect)
@@ -93,6 +95,7 @@ export default function AdminPage() {
       socket.off('music_actualizada',     onMusicActualizada)
       socket.off('music_eliminada',       onMusicEliminada)
       socket.off('music_playing_cleared', onMusicCleared)
+      socket.off('music_vote',            onMusicVote)
     }
   }, [eventId])
 
@@ -260,6 +263,7 @@ export default function AdminPage() {
                         <div className={s.musicCardArtist}>{r.artist_name}</div>
                         {r.album_name && <div className={s.musicCardAlbum}>{r.album_name}</div>}
                       </div>
+                      {r.votes > 0 && <div className={s.musicVoteBadge}>🔥 {r.votes}</div>}
                       <div className={s.musicCardActions}>
                         <button className={`${s.musicBtn} ${s.musicBtnDel}`} onClick={() => deleteRequest(r.id)} title="Eliminar">🗑</button>
                       </div>

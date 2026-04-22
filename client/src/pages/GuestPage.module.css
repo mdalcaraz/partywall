@@ -165,6 +165,7 @@
 }
 .btnSecondary:hover { border-color: var(--gold); color: var(--gold); }
 .btnPrimary {
+  flex: 1.5;
   background: var(--gold);
   color: #080808;
   font-weight: 600;
