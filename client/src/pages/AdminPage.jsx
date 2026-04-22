@@ -140,6 +140,7 @@ export default function AdminPage() {
   }
 
   const currentPhoto = photos.find((p) => p.id === currentId) ?? null
+  const playlist     = photos.filter((p) => p.inSlideshow)
 
   return (
     <div className={s.page}>
@@ -180,7 +181,15 @@ export default function AdminPage() {
           </div>
 
           <div className={s.sideSection}>
-            <div className={s.sectionLabel}>Slideshow automático</div>
+            <div className={s.sectionLabel}>Modo de reproducción</div>
+            <div className={s.modeToggle}>
+              <button className={`${s.modeBtn} ${!ssActive ? s.modeBtnActive : ''}`} onClick={() => { if (ssActive) toggleSlideshow() }}>
+                Manual
+              </button>
+              <button className={`${s.modeBtn} ${ssActive ? s.modeBtnActive : ''}`} onClick={() => { if (!ssActive) toggleSlideshow() }}>
+                ▶ Lista
+              </button>
+            </div>
             <div className={s.intervalRow}>
               {INTERVALS.map((sec) => (
                 <button key={sec} className={`${s.intervalBtn} ${ssInterval === sec ? s.intervalSelected : ''}`} onClick={() => changeInterval(sec)}>
@@ -188,9 +197,6 @@ export default function AdminPage() {
                 </button>
               ))}
             </div>
-            <button className={`${s.btnSs} ${ssActive ? s.btnSsActive : ''}`} onClick={toggleSlideshow}>
-              {ssActive ? '⏸ Detener slideshow' : '▶ Iniciar slideshow'}
-            </button>
           </div>
         </aside>
 
@@ -204,6 +210,27 @@ export default function AdminPage() {
               <button className={s.btnClearAll} onClick={clearAll}>🗑 Borrar todas</button>
             </div>
 
+            {/* ── Playlist strip ── */}
+            <div className={s.playlistSection}>
+              <div className={s.playlistHeader}>
+                <span className={s.playlistLabel}>Lista de reproducción</span>
+                <span className={s.playlistCount}>{playlist.length} foto{playlist.length !== 1 ? 's' : ''}</span>
+              </div>
+              {playlist.length === 0 ? (
+                <div className={s.playlistEmpty}>Vacía · Usá "+ Lista" en cada foto para agregarla</div>
+              ) : (
+                <div className={s.playlistStrip}>
+                  {playlist.map((photo) => (
+                    <div key={photo.id} className={`${s.playlistItem} ${photo.id === currentId ? s.playlistItemActive : ''}`}>
+                      <img src={photo.url} alt="" className={s.playlistThumb} />
+                      <button className={s.btnRemoveFromList} onClick={() => toggleSlide(photo.id)} title="Quitar de lista">×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── Photo grid ── */}
             <div className={s.photoGrid}>
               {photos.length === 0 ? (
                 <div className={s.emptyState}>
@@ -212,20 +239,20 @@ export default function AdminPage() {
                 </div>
               ) : (
                 photos.map((photo, i) => (
-                  <div key={photo.id} className={`${s.photoCard} ${photo.id === currentId ? s.photoCardActive : ''} ${!photo.inSlideshow ? s.photoCardExcluded : ''}`}>
+                  <div key={photo.id} className={`${s.photoCard} ${photo.id === currentId ? s.photoCardActive : ''}`}>
                     <img src={photo.url} loading="lazy" alt="foto" />
                     {i === 0 && photo._new && <div className={s.newBadge}>NUEVA</div>}
                     {photo.id === currentId && <div className={s.activeBadge}>✦ Activa</div>}
-                    <button
-                      className={`${s.btnSlide} ${photo.inSlideshow ? s.btnSlideOn : s.btnSlideOff}`}
-                      onClick={(e) => { e.stopPropagation(); toggleSlide(photo.id) }}
-                      title={photo.inSlideshow ? 'Quitar del slideshow' : 'Incluir en slideshow'}
-                    >
-                      {photo.inSlideshow ? '▶' : '⏸'}
-                    </button>
+                    {photo.inSlideshow && <div className={s.inListBadge}>✓ Lista</div>}
                     <div className={s.photoOverlay}>
                       <div className={s.overlayActions}>
                         <button className={s.btnProject} onClick={() => project(photo)}>📽 Proyectar</button>
+                        <button
+                          className={`${s.btnAddList} ${photo.inSlideshow ? s.btnAddListActive : ''}`}
+                          onClick={(e) => { e.stopPropagation(); toggleSlide(photo.id) }}
+                        >
+                          {photo.inSlideshow ? '✓' : '+ Lista'}
+                        </button>
                         <button className={s.btnDelete} onClick={() => deletePhoto(photo.id)} title="Eliminar">🗑</button>
                       </div>
                     </div>
