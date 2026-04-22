@@ -22,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     in_slideshow: {
       type:         DataTypes.BOOLEAN,
-      defaultValue: true,
+      defaultValue: false,
     },
   }, {
     tableName:   'photos',

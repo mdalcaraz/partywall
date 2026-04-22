@@ -29,7 +29,7 @@ module.exports = {
       },
       in_slideshow: {
         type:         Sequelize.BOOLEAN,
-        defaultValue: true,
+        defaultValue: false,
       },
     });
 
