@@ -201,6 +201,17 @@ function checkMusicLimit(req, event) {
   return { allowed: true };
 }
 
+function peekRateLimit(limits, key, max, windowMs) {
+  const now   = Date.now();
+  const entry = limits.get(key) || { timestamps: [] };
+  const valid = entry.timestamps.filter(t => now - t < windowMs);
+  const remaining  = Math.max(0, max - valid.length);
+  const retryAfter = remaining === 0 && valid.length > 0
+    ? Math.ceil((valid[0] + windowMs - now) / 1000)
+    : 0;
+  return { remaining, retryAfter };
+}
+
 // ── API: Login ────────────────────────────────────────────────────────────
 app.post(`${BASE}/api/login`, async (req, res) => {
   const { username, password } = req.body;
@@ -329,6 +340,16 @@ app.get(`${BASE}/api/e/:eventId/photos`, requireAnyAdmin, async (req, res) => {
   res.json(photos.map(normalize));
 });
 
+app.get(`${BASE}/api/e/:eventId/guest/info`, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event || !event.active) return res.status(404).json({ error: 'Evento no encontrado' });
+  const max       = event.photo_limit  || 3;
+  const windowMs  = (event.photo_window || 60) * 1000;
+  const key       = `${req.params.eventId}:${clientId(req)}`;
+  const rateLimit = peekRateLimit(uploadLimits, key, max, windowMs);
+  res.json({ active: true, rateLimit });
+});
+
 app.get(`${BASE}/api/e/:eventId/qr`, async (req, res) => {
   const event = await Event.findByPk(req.params.eventId);
   if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
@@ -380,7 +401,10 @@ app.post(`${BASE}/api/e/:eventId/upload`, upload.single('photo'), async (req, re
 
   io.to(`event:${req.params.eventId}`).emit('nueva_foto', photo);
   console.log(`📸 [${req.params.eventId}] ${req.file.filename}`);
-  res.json({ success: true, photo });
+
+  const peekKey   = `${req.params.eventId}:${clientId(req)}`;
+  const afterSend = peekRateLimit(uploadLimits, peekKey, event.photo_limit || 3, (event.photo_window || 60) * 1000);
+  res.json({ success: true, photo, remaining: afterSend.remaining, retryAfter: afterSend.retryAfter });
 });
 
 // ── API: Music — Spotify search (public) ──────────────────────────────────
@@ -438,6 +462,10 @@ app.get(`${BASE}/api/e/:eventId/music/search`, async (req, res) => {
 app.get(`${BASE}/api/e/:eventId/music/info`, async (req, res) => {
   const event = await Event.findByPk(req.params.eventId);
   if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
+  const max       = event.music_limit  || 10;
+  const windowMs  = (event.music_window || 600) * 1000;
+  const key       = `music:${req.params.eventId}:${clientId(req)}`;
+  const rateLimit = peekRateLimit(musicLimits, key, max, windowMs);
   res.json({
     name:             event.name,
     date:             event.date         || null,
@@ -448,6 +476,7 @@ app.get(`${BASE}/api/e/:eventId/music/info`, async (req, res) => {
     brand_name:       event.brand_name      || 'Top DJ Group',
     brand_logo_url:   event.brand_logo_url  || null,
     brand_instagram:  event.brand_instagram || 'topdjgroup',
+    rateLimit,
   });
 });
 
@@ -484,7 +513,10 @@ app.post(`${BASE}/api/e/:eventId/music/requests`, async (req, res) => {
 
   io.to(`event:${req.params.eventId}`).emit('music_nueva', request.toJSON());
   console.log(`🎵 [${req.params.eventId}] ${artistName} — ${trackName}`);
-  res.json({ success: true, request: request.toJSON() });
+
+  const peekKey   = `music:${req.params.eventId}:${clientId(req)}`;
+  const afterSend = peekRateLimit(musicLimits, peekKey, event.music_limit || 10, (event.music_window || 600) * 1000);
+  res.json({ success: true, request: request.toJSON(), remaining: afterSend.remaining, retryAfter: afterSend.retryAfter });
 });
 
 // ── API: Music — List requests (admin) ────────────────────────────────────

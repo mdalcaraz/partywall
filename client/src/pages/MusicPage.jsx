@@ -44,16 +44,17 @@ export default function MusicPage() {
   const cooldownRef  = useRef(null)
 
   useEffect(() => {
-    fetch(`${BASE}api/e/${eventId}/music/info`)
+    fetch(`${BASE}api/e/${eventId}/music/info`, { headers: { 'X-Device-ID': getDeviceId() } })
       .then(r => r.json())
       .then(d => {
         setEventName(d.name || '')
         setAvailable(!!(d.active && d.music_enabled))
         if (d.brand_logo_url) setBrandLogo(d.brand_logo_url)
         if (d.brand_instagram) setBrandIg(d.brand_instagram)
+        if (d.rateLimit?.retryAfter > 0) startCooldown(d.rateLimit.retryAfter)
       })
       .catch(() => setAvailable(false))
-  }, [eventId])
+  }, [eventId]) // eslint-disable-line
 
   useEffect(() => {
     if (!eventId) return
@@ -135,6 +136,7 @@ export default function MusicPage() {
       if (!r.ok) { showToast(d.error || 'Error al pedir', 'error'); return }
       setRequested(prev => new Set([...prev, track.id]))
       showToast(`¡Pedido! ${track.artist} — ${track.name}`, 'success')
+      if ((d.remaining ?? 1) === 0) startCooldown(d.retryAfter || 60)
     } catch {
       showToast('Error de conexión', 'error')
     }

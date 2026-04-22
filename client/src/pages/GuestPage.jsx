@@ -77,6 +77,15 @@ export default function GuestPage() {
   }, [startCamera]) // eslint-disable-line
 
   useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}api/e/${eventId}/guest/info`, {
+      headers: { 'X-Device-ID': getDeviceId() },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.rateLimit?.retryAfter > 0) startCooldown(d.rateLimit.retryAfter) })
+      .catch(() => {})
+  }, [eventId]) // eslint-disable-line
+
+  useEffect(() => {
     const mq = window.matchMedia('(orientation: landscape)')
     const handleOrientationChange = () => startCamera(facingMode)
     mq.addEventListener('change', handleOrientationChange)
@@ -149,8 +158,10 @@ export default function GuestPage() {
       if (!data.success) throw new Error(data.error)
       setSentCount((c) => c + 1)
       launchConfetti()
-      setStatus({ text: '¡Foto enviada! 🎉', type: 'ok' })
+      const remaining = data.remaining ?? 1
+      setStatus({ text: remaining > 0 ? `¡Foto enviada! 🎉 · Te queda${remaining !== 1 ? 'n' : ''} ${remaining}` : '¡Foto enviada! 🎉', type: 'ok' })
       setMode('sent')
+      if (remaining === 0) startCooldown(data.retryAfter || 60)
       setTimeout(resetToCamera, 2200)
     } catch {
       setStatus({ text: 'Error al enviar. Reintentá.', type: 'err' })
