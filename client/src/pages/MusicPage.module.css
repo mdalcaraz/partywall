@@ -366,6 +366,15 @@
   white-space: nowrap;
 }
 .igBtn:active { opacity: .82; transform: scale(.95); }
+.igFooterTerms {
+  font-size: .6rem; color: rgba(255,255,255,.25); text-align: center;
+}
+.igFooterTermsLink {
+  background: none; border: none; padding: 0;
+  color: inherit; font-size: inherit; font-family: inherit;
+  cursor: pointer; text-decoration: underline; opacity: .9;
+}
+.igFooterTermsLink:hover { color: rgba(255,255,255,.5); }
 
 /* ── Toast ── */
 .toast {

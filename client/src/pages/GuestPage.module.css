@@ -233,6 +233,13 @@
 }
 .igLink:hover { color: var(--gold); }
 .trademark { font-size: .65rem; color: var(--muted); opacity: .5; }
+.terms { font-size: .6rem; color: var(--muted); opacity: .4; text-align: center; }
+.termsLink {
+  background: none; border: none; padding: 0;
+  color: inherit; font-size: inherit; font-family: inherit;
+  cursor: pointer; text-decoration: underline; opacity: .8;
+}
+.termsLink:hover { opacity: 1; }
 
 /* ── Landscape ── */
 @media (orientation: landscape) {

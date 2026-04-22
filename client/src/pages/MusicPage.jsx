@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { getSocket } from '../lib/socket'
 import { getDeviceId } from '../lib/api'
+import TermsModal from '../components/TermsModal'
 import s from './MusicPage.module.css'
 
 const BASE = import.meta.env.BASE_URL
@@ -37,6 +38,7 @@ export default function MusicPage() {
   const [preview, setPreview]           = useState(null)
   const [previewProgress, setProgress]  = useState(0)
   const [cooldown, setCooldown]         = useState(0)
+  const [showTerms, setShowTerms]       = useState(false)
   const audioRef     = useRef(null)
   const progressRef  = useRef(null)
   const toastRef     = useRef(null)
@@ -357,11 +359,17 @@ export default function MusicPage() {
           <IgIcon />
           Seguinos @{brandIg}
         </a>
+        <span className={s.igFooterTerms}>
+          Al usar esta app aceptás nuestros{' '}
+          <button className={s.igFooterTermsLink} onClick={() => setShowTerms(true)}>T&amp;C</button>
+        </span>
       </div>
 
       <div className={`${s.toast} ${toast.v ? s.toastShow : ''} ${toast.type === 'success' ? s.toastSuccess : ''} ${toast.type === 'error' ? s.toastError : ''}`}>
         {toast.msg}
       </div>
+
+      {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
     </div>
   )
 }

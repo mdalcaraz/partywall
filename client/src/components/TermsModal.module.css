@@ -1,0 +1,76 @@
+.overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.72);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 0;
+  animation: fadeIn .2s ease;
+}
+
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+.sheet {
+  background: #141414;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 20px 20px 0 0;
+  width: 100%; max-width: 560px;
+  max-height: 80dvh;
+  display: flex; flex-direction: column;
+  animation: slideUp .25s ease;
+  overflow: hidden;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0 }
+  to   { transform: translateY(0);    opacity: 1 }
+}
+
+.close {
+  position: absolute; top: 14px; right: 18px;
+  background: none; border: none;
+  color: rgba(255,255,255,.4); font-size: 1rem;
+  cursor: pointer; padding: 4px 8px;
+}
+.close:hover { color: rgba(255,255,255,.8); }
+
+.title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.3rem; letter-spacing: .06em;
+  color: #e8bf5a;
+  padding: 22px 24px 0;
+  flex-shrink: 0;
+}
+
+.body {
+  overflow-y: auto;
+  padding: 12px 24px 8px;
+  font-size: .82rem;
+  line-height: 1.65;
+  color: rgba(255,255,255,.55);
+  flex: 1;
+}
+
+.body h3 {
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: rgba(255,255,255,.35);
+  margin: 14px 0 4px;
+}
+
+.body p {
+  margin: 0 0 6px;
+}
+
+.btnClose {
+  flex-shrink: 0;
+  margin: 12px 24px 20px;
+  height: 46px;
+  border-radius: 12px; border: none;
+  background: rgba(255,255,255,.08);
+  color: rgba(255,255,255,.7);
+  font-family: var(--font-body);
+  font-size: .88rem; font-weight: 600;
+  cursor: pointer; transition: background .2s;
+}
+.btnClose:hover { background: rgba(255,255,255,.13); }

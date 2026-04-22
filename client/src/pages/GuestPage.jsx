@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { getDeviceId } from '../lib/api'
+import TermsModal from '../components/TermsModal'
 import s from './GuestPage.module.css'
 
 const TIMER_OPTIONS = [0, 3, 5]
@@ -45,6 +46,7 @@ export default function GuestPage() {
   const [showFlash, setShowFlash]     = useState(false)
   const [cameraError, setCameraError] = useState(false)
   const [cooldown, setCooldown]       = useState(0)
+  const [showTerms, setShowTerms]     = useState(false)
   const cooldownRef = useRef(null)
 
   const timerDelay = TIMER_OPTIONS[timerIdx]
@@ -301,7 +303,13 @@ export default function GuestPage() {
           📷 @topdjgroup
         </a>
         <span className={s.trademark}>Top DJ Group® · Marca registrada</span>
+        <span className={s.terms}>
+          Al usar esta app aceptás nuestros{' '}
+          <button className={s.termsLink} onClick={() => setShowTerms(true)}>Términos y Condiciones</button>
+        </span>
       </footer>
+
+      {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
 
       <canvas ref={canvasRef} style={{ display: 'none' }} />
     </div>
