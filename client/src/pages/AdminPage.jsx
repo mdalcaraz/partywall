@@ -23,6 +23,7 @@ export default function AdminPage() {
   const [toast, setToast]           = useState({ msg: '', type: '', visible: false })
   const [panelMode, setPanelMode]   = useState('proyeccion') // 'proyeccion' | 'album'
   const [albumPhotos, setAlbumPhotos] = useState([])
+  const [showQrs, setShowQrs]       = useState(false)
   const toastTimer = useRef(null)
   const socketRef  = useRef(null)
 
@@ -238,21 +239,26 @@ export default function AdminPage() {
         {/* ── Sidebar ── */}
         <aside className={s.sidebar}>
           <div className={s.sideSection}>
-            <div className={s.sectionLabel}>QR para invitados</div>
-            <div className={s.qrBlock}>
-              {qr ? (<><img src={qr.qr} alt="QR" /><div className={s.qrUrl}>{qr.url}</div></>) : (<div className={s.qrLoading}>Cargando QR...</div>)}
-            </div>
+            <button className={s.qrToggle} onClick={() => setShowQrs(v => !v)}>
+              <span className={s.sectionLabel} style={{ pointerEvents: 'none' }}>Códigos QR</span>
+              <span className={s.qrToggleIcon}>{showQrs ? '▲' : '▼'}</span>
+            </button>
+            {showQrs && (
+              <>
+                <div className={s.qrBlock}>
+                  <div className={s.qrLabel}>Fotos</div>
+                  {qr ? (<><img src={qr.qr} alt="QR" /><div className={s.qrUrl}>{qr.url}</div></>) : (<div className={s.qrLoading}>Cargando...</div>)}
+                </div>
+                {musicEnabled && musicQr && (
+                  <div className={s.qrBlock}>
+                    <div className={s.qrLabel}>Música</div>
+                    <img src={musicQr.qr} alt="QR Música" />
+                    <div className={s.qrUrl}>{musicQr.url}</div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-
-          {musicEnabled && musicQr && (
-            <div className={s.sideSection}>
-              <div className={s.sectionLabel}>QR para música</div>
-              <div className={s.qrBlock}>
-                <img src={musicQr.qr} alt="QR Música" />
-                <div className={s.qrUrl}>{musicQr.url}</div>
-              </div>
-            </div>
-          )}
 
           <div className={s.sideSection}>
             <div className={s.sectionLabel}>Proyectando ahora</div>

@@ -83,6 +83,21 @@
   color: var(--muted); padding-left: 3px;
 }
 
+.qrToggle {
+  display: flex; align-items: center;
+  width: 100%; background: none; border: none;
+  padding: 4px 3px; cursor: pointer;
+  gap: 6px;
+}
+.qrToggleIcon {
+  margin-left: auto;
+  font-size: .6rem; color: var(--muted); opacity: .5;
+}
+
+.qrLabel {
+  font-size: .6rem; letter-spacing: .25em; text-transform: uppercase;
+  color: #777; padding-left: 2px; align-self: flex-start;
+}
 .qrBlock {
   background: white;
   border-radius: 12px; padding: 10px;
