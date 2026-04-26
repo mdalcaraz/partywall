@@ -641,11 +641,6 @@ app.get(`${BASE}/api/e/:eventId/album/download`, async (req, res) => {
   const event = await Event.findByPk(req.params.eventId);
   if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
 
-  const photos = await Photo.findAll({
-    where: { event_id: req.params.eventId, deleted_at: null },
-    order: [['timestamp', 'ASC']],
-  });
-
   const { ids } = req.query;
   const idList  = ids ? ids.split(',').filter(Boolean) : null;
   const where   = { event_id: req.params.eventId, deleted_at: null };
