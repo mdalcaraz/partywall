@@ -21,7 +21,7 @@ export default function IndexPage() {
     <div className={s.page}>
       <div className={s.header}>
         <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Top DJ Group" className={s.logo} />
-        <div className={s.tagline}>Foto Booth · Panel de control</div>
+        <div className={s.tagline}>Partywall · Panel de control</div>
       </div>
 
       <div className={s.grid}>
