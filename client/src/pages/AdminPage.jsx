@@ -179,6 +179,15 @@ export default function AdminPage() {
           </button>
         </div>
         <div className={s.spacer} />
+        <a
+          href={`${BASE}e/${eventId}/album`}
+          target="_blank"
+          rel="noreferrer"
+          className={s.btnAlbumLink}
+          title="Ver álbum público"
+        >
+          🖼 Ver álbum ↗
+        </a>
         <div className={s.statChip}><div className={s.dot} /><span>Servidor activo</span></div>
         <div className={s.connBadge}>{connected ? 'conectado' : 'desconectado'}</div>
         <button className={s.btnLogout} onClick={logout} title="Cerrar sesión">⎋ Salir</button>

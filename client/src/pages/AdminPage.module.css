@@ -43,8 +43,24 @@
   font-family: var(--font-body);
   cursor: pointer;
   transition: all .2s;
+  text-decoration: none;
 }
 .btnLogout:hover { border-color: var(--red); color: var(--red); }
+
+.btnAlbumLink {
+  display: flex; align-items: center; gap: 5px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: .78rem;
+  font-family: var(--font-body);
+  text-decoration: none;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.btnAlbumLink:hover { border-color: var(--gold); color: var(--gold); }
 
 /* ── Layout ── */
 .layout {
