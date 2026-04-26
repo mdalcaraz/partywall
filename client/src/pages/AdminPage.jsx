@@ -235,7 +235,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      <div className={`${s.layout} ${panelMode !== 'proyeccion' ? s.layoutHidden : ''}`}>
+      <div className={`${s.layout} ${panelMode !== 'proyeccion' ? s.layoutHidden : ''} ${showQrs ? s.layoutQrOpen : ''}`}>
         {/* ── Sidebar ── */}
         <aside className={s.sidebar}>
           <div className={s.sideSection}>
@@ -244,7 +244,7 @@ export default function AdminPage() {
               <span className={s.qrToggleIcon}>{showQrs ? '▲' : '▼'}</span>
             </button>
             {showQrs && (
-              <>
+              <div className={s.qrRow}>
                 <div className={s.qrBlock}>
                   <div className={s.qrLabel}>Fotos</div>
                   {qr ? (<><img src={qr.qr} alt="QR" /><div className={s.qrUrl}>{qr.url}</div></>) : (<div className={s.qrLoading}>Cargando...</div>)}
@@ -256,7 +256,7 @@ export default function AdminPage() {
                     <div className={s.qrUrl}>{musicQr.url}</div>
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
 
