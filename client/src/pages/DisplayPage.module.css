@@ -119,9 +119,9 @@
   line-height: 1.4;
 }
 .qrImg {
-  width: clamp(80px, 9vw, 130px);
-  height: clamp(80px, 9vw, 130px);
-  border-radius: 6px;
+  width: clamp(160px, 18vw, 260px);
+  height: clamp(160px, 18vw, 260px);
+  border-radius: 8px;
   display: block;
 }
 

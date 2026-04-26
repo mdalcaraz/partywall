@@ -235,7 +235,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      <div className={`${s.layout} ${panelMode !== 'proyeccion' ? s.layoutHidden : ''} ${showQrs ? s.layoutQrOpen : ''}`}>
+      <div className={`${s.layout} ${panelMode !== 'proyeccion' ? s.layoutHidden : ''}`}>
         {/* ── Sidebar ── */}
         <aside className={s.sidebar}>
           <div className={s.sideSection}>
