@@ -15,6 +15,7 @@
     "seed": "sequelize-cli db:seed:all"
   },
   "dependencies": {
+    "archiver": "^7.0.1",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "express": "^4.18.2",

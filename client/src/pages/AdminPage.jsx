@@ -21,6 +21,8 @@ export default function AdminPage() {
   const [qr, setQr]                 = useState(null)
   const [connected, setConnected]   = useState(false)
   const [toast, setToast]           = useState({ msg: '', type: '', visible: false })
+  const [panelMode, setPanelMode]   = useState('proyeccion') // 'proyeccion' | 'album'
+  const [albumPhotos, setAlbumPhotos] = useState([])
   const toastTimer = useRef(null)
   const socketRef  = useRef(null)
 
@@ -54,11 +56,23 @@ export default function AdminPage() {
       if (mr) setMusicRequests(mr)
       if (me !== undefined) setMusicEnabled(!!me)
     }
-    const onNueva      = (photo)          => { setPhotos((prev) => [{ ...photo, _new: true }, ...prev]); showToast('📸 Nueva foto recibida', 'green') }
-    const onEliminada  = ({ id })         => { setPhotos((prev) => prev.filter((p) => p.id !== id)); setCurrentId((cur) => (cur === id ? null : cur)) }
+    const onNueva      = (photo)          => {
+      setPhotos((prev) => [{ ...photo, _new: true }, ...prev])
+      setAlbumPhotos((prev) => [photo, ...prev])
+      showToast('📸 Nueva foto recibida', 'green')
+    }
+    const onEliminada  = ({ id })         => {
+      setPhotos((prev) => prev.filter((p) => p.id !== id))
+      setAlbumPhotos((prev) => prev.filter((p) => p.id !== id))
+      setCurrentId((cur) => (cur === id ? null : cur))
+    }
     const onMostrar    = (photo)          => setCurrentId(photo?.id ?? null)
     const onSlideshow  = ({ active })     => setSsActive(active)
     const onActualizada = ({ id, inSlideshow }) => setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow } : p))
+    const onOcultada   = ({ id, hidden }) => {
+      setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, hidden } : p))
+      setAlbumPhotos((prev) => prev.map((p) => p.id === id ? { ...p, hidden } : p))
+    }
 
     // Music socket events
     const onMusicNueva       = (r)               => { setMusicRequests(prev => [...prev, r]); showToast(`🎵 ${r.artist_name} — ${r.track_name}`, 'green') }
@@ -76,6 +90,7 @@ export default function AdminPage() {
     socket.on('mostrar_foto',          onMostrar)
     socket.on('slideshow_estado',      onSlideshow)
     socket.on('foto_actualizada',      onActualizada)
+    socket.on('foto_ocultada',         onOcultada)
     socket.on('music_nueva',           onMusicNueva)
     socket.on('music_actualizada',     onMusicActualizada)
     socket.on('music_eliminada',       onMusicEliminada)
@@ -91,6 +106,7 @@ export default function AdminPage() {
       socket.off('mostrar_foto',          onMostrar)
       socket.off('slideshow_estado',      onSlideshow)
       socket.off('foto_actualizada',      onActualizada)
+      socket.off('foto_ocultada',         onOcultada)
       socket.off('music_nueva',           onMusicNueva)
       socket.off('music_actualizada',     onMusicActualizada)
       socket.off('music_eliminada',       onMusicEliminada)
@@ -102,6 +118,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!eventId) return
     authFetch(`${BASE}api/e/${eventId}/photos`).then((r) => r.json()).then((ph) => setPhotos((prev) => (prev.length ? prev : ph)))
+    authFetch(`${BASE}api/e/${eventId}/photos/all`).then((r) => r.json()).then((ph) => { if (Array.isArray(ph)) setAlbumPhotos(ph) })
     authFetch(`${BASE}api/e/${eventId}/qr`).then((r) => r.json()).then(setQr)
     authFetch(`${BASE}api/e/${eventId}/music/requests`).then((r) => r.json()).then((data) => {
       if (Array.isArray(data)) setMusicRequests(data)
@@ -134,6 +151,12 @@ export default function AdminPage() {
   }
   const changeInterval = (val) => { setSsInterval(val); if (ssActive) socketRef.current?.emit('slideshow_start', { eventId, interval: val * 1000 }) }
 
+  const hidePhoto = (id) => {
+    setAlbumPhotos((prev) => prev.map((p) => p.id === id ? { ...p, hidden: !p.hidden } : p))
+    authFetch(`${BASE}api/e/${eventId}/photos/${id}/hide`, { method: 'PATCH' })
+      .then((r) => { if (!r.ok) setAlbumPhotos((prev) => prev.map((p) => p.id === id ? { ...p, hidden: !p.hidden } : p)) })
+  }
+
   // ── Music actions ─────────────────────────────────────────────────────────
   const deleteRequest = async (id) => {
     await authFetch(`${BASE}api/e/${eventId}/music/requests/${id}`, { method: 'DELETE' })
@@ -146,13 +169,63 @@ export default function AdminPage() {
     <div className={s.page}>
       <div className={s.topbar}>
         <img src={`${BASE}logo.png`} alt="Top DJ Group" className={s.logo} />
+        <div className={s.panelTabs}>
+          <button className={`${s.panelTab} ${panelMode === 'proyeccion' ? s.panelTabActive : ''}`} onClick={() => setPanelMode('proyeccion')}>
+            📽 Proyección
+          </button>
+          <button className={`${s.panelTab} ${panelMode === 'album' ? s.panelTabActive : ''}`} onClick={() => setPanelMode('album')}>
+            🖼 Álbum
+            {albumPhotos.length > 0 && <span className={s.albumTabCount}>{albumPhotos.length}</span>}
+          </button>
+        </div>
         <div className={s.spacer} />
         <div className={s.statChip}><div className={s.dot} /><span>Servidor activo</span></div>
         <div className={s.connBadge}>{connected ? 'conectado' : 'desconectado'}</div>
         <button className={s.btnLogout} onClick={logout} title="Cerrar sesión">⎋ Salir</button>
       </div>
 
-      <div className={s.layout}>
+      {/* ── Album panel ── */}
+      {panelMode === 'album' && (
+        <div className={s.albumPanel}>
+          <div className={s.albumPanelHeader}>
+            <div className={s.panelTitle}>🖼 Álbum del evento</div>
+            <span className={s.albumSubtitle}>
+              Las fotos ocultas no aparecen en proyección pero sí en el álbum público. Eliminadas desaparecen de todo.
+            </span>
+          </div>
+          {albumPhotos.length === 0 ? (
+            <div className={s.emptyState}>
+              <div className={s.emptyIcon}>📭</div>
+              <p>No hay fotos en el álbum todavía.</p>
+            </div>
+          ) : (
+            <div className={s.albumGrid}>
+              {albumPhotos.map((photo) => (
+                <div key={photo.id} className={`${s.albumCard} ${photo.hidden ? s.albumCardHidden : ''}`}>
+                  <img src={photo.url} loading="lazy" alt="" />
+                  {photo.hidden && <div className={s.hiddenBadge}>Oculta</div>}
+                  <div className={s.albumOverlay}>
+                    <div className={s.albumOverlayActions}>
+                      <button
+                        className={`${s.btnAlbumHide} ${photo.hidden ? s.btnAlbumHideActive : ''}`}
+                        onClick={() => hidePhoto(photo.id)}
+                        title={photo.hidden ? 'Mostrar en proyección' : 'Ocultar de proyección'}
+                      >
+                        {photo.hidden ? '👁 Mostrar' : '🚫 Ocultar'}
+                      </button>
+                      <button className={s.btnAlbumDelete} onClick={() => deletePhoto(photo.id)} title="Eliminar definitivamente">
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className={`${s.layout} ${panelMode !== 'proyeccion' ? s.layoutHidden : ''}`}>
         {/* ── Sidebar ── */}
         <aside className={s.sidebar}>
           <div className={s.sideSection}>

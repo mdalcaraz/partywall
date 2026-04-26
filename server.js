@@ -1,15 +1,16 @@
 require('dotenv').config();
-const http    = require('http');
-const express = require('express');
+const http     = require('http');
+const express  = require('express');
 const { Server } = require('socket.io');
-const multer  = require('multer');
-const path    = require('path');
-const fs      = require('fs');
-const QRCode  = require('qrcode');
-const os      = require('os');
-const crypto  = require('crypto');
-const bcrypt  = require('bcryptjs');
-const jwt     = require('jsonwebtoken');
+const multer   = require('multer');
+const path     = require('path');
+const fs       = require('fs');
+const QRCode   = require('qrcode');
+const archiver = require('archiver');
+const os       = require('os');
+const crypto   = require('crypto');
+const bcrypt   = require('bcryptjs');
+const jwt      = require('jsonwebtoken');
 const { sequelize, Event, Photo, MusicRequest } = require('./models');
 
 // ── Config ────────────────────────────────────────────────────────────────
@@ -62,7 +63,7 @@ function requireAnyAdmin(req, res, next) {
 function normalize(photo) {
   if (!photo) return null;
   const p = photo.toJSON ? photo.toJSON() : photo;
-  return { ...p, inSlideshow: !!p.in_slideshow };
+  return { ...p, inSlideshow: !!p.in_slideshow, hidden: !!p.hidden };
 }
 
 // ── Slideshow state (in-memory timers, per event) ─────────────────────────
@@ -81,7 +82,7 @@ function startSlideshow(eventId) {
   ss.active = true;
   ss.timer = setInterval(async () => {
     const photos = await Photo.findAll({
-      where:   { event_id: eventId, in_slideshow: true },
+      where:   { event_id: eventId, in_slideshow: true, hidden: false, deleted_at: null },
       order:   [['timestamp', 'ASC']],
     });
     if (!photos.length) return;
@@ -335,7 +336,15 @@ app.delete(`${BASE}/api/events/:id`, requireSuperAdmin, async (req, res) => {
 // ── API: Event — Photos (operario + superadmin) ───────────────────────────
 app.get(`${BASE}/api/e/:eventId/photos`, requireAnyAdmin, async (req, res) => {
   const photos = await Photo.findAll({
-    where: { event_id: req.params.eventId },
+    where: { event_id: req.params.eventId, hidden: false, deleted_at: null },
+    order: [['timestamp', 'DESC']],
+  });
+  res.json(photos.map(normalize));
+});
+
+app.get(`${BASE}/api/e/:eventId/photos/all`, requireAnyAdmin, async (req, res) => {
+  const photos = await Photo.findAll({
+    where: { event_id: req.params.eventId, deleted_at: null },
     order: [['timestamp', 'DESC']],
   });
   res.json(photos.map(normalize));
@@ -361,18 +370,25 @@ app.get(`${BASE}/api/e/:eventId/qr`, async (req, res) => {
 });
 
 app.patch(`${BASE}/api/e/:eventId/photos/:photoId/slideshow`, requireAnyAdmin, async (req, res) => {
-  const photo = await Photo.findOne({ where: { id: req.params.photoId, event_id: req.params.eventId } });
+  const photo = await Photo.findOne({ where: { id: req.params.photoId, event_id: req.params.eventId, deleted_at: null } });
   if (!photo) return res.status(404).json({ error: 'No encontrada' });
   await photo.update({ in_slideshow: !photo.in_slideshow });
   io.to(`event:${req.params.eventId}`).emit('foto_actualizada', { id: photo.id, inSlideshow: photo.in_slideshow });
   res.json({ success: true, inSlideshow: photo.in_slideshow });
 });
 
-app.delete(`${BASE}/api/e/:eventId/photos/:photoId`, requireAnyAdmin, async (req, res) => {
-  const photo = await Photo.findOne({ where: { id: req.params.photoId, event_id: req.params.eventId } });
+app.patch(`${BASE}/api/e/:eventId/photos/:photoId/hide`, requireAnyAdmin, async (req, res) => {
+  const photo = await Photo.findOne({ where: { id: req.params.photoId, event_id: req.params.eventId, deleted_at: null } });
   if (!photo) return res.status(404).json({ error: 'No encontrada' });
-  try { fs.unlinkSync(`storage/${req.params.eventId}/uploads/${photo.filename}`); } catch {}
-  await photo.destroy();
+  await photo.update({ hidden: !photo.hidden });
+  io.to(`event:${req.params.eventId}`).emit('foto_ocultada', { id: photo.id, hidden: photo.hidden });
+  res.json({ success: true, hidden: photo.hidden });
+});
+
+app.delete(`${BASE}/api/e/:eventId/photos/:photoId`, requireAnyAdmin, async (req, res) => {
+  const photo = await Photo.findOne({ where: { id: req.params.photoId, event_id: req.params.eventId, deleted_at: null } });
+  if (!photo) return res.status(404).json({ error: 'No encontrada' });
+  await photo.update({ deleted_at: new Date(), in_slideshow: false });
   io.to(`event:${req.params.eventId}`).emit('foto_eliminada', { id: req.params.photoId });
   res.json({ success: true });
 });
@@ -600,6 +616,51 @@ app.get(`${BASE}/api/e/:eventId/music/qr/public`, async (req, res) => {
   res.json({ enabled: true, url, qr });
 });
 
+// ── API: Album público ────────────────────────────────────────────────────
+app.get(`${BASE}/api/e/:eventId/album/info`, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
+  res.json({
+    name:            event.name,
+    date:            event.date         || null,
+    location:        event.location     || null,
+    brand_logo_url:  event.brand_logo_url  || null,
+    brand_instagram: event.brand_instagram || null,
+  });
+});
+
+app.get(`${BASE}/api/e/:eventId/album`, async (req, res) => {
+  const photos = await Photo.findAll({
+    where: { event_id: req.params.eventId, deleted_at: null },
+    order: [['timestamp', 'ASC']],
+  });
+  res.json(photos.map(normalize));
+});
+
+app.get(`${BASE}/api/e/:eventId/album/download`, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
+
+  const photos = await Photo.findAll({
+    where: { event_id: req.params.eventId, deleted_at: null },
+    order: [['timestamp', 'ASC']],
+  });
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="album_${event.name.replace(/[^a-z0-9]/gi, '_')}.zip"`);
+
+  const archive = archiver('zip', { zlib: { level: 1 } });
+  archive.on('error', (err) => { console.error('ZIP error:', err); res.end(); });
+  archive.pipe(res);
+
+  for (const photo of photos) {
+    const filePath = path.join('storage', req.params.eventId, 'uploads', photo.filename);
+    if (fs.existsSync(filePath)) archive.file(filePath, { name: photo.filename });
+  }
+
+  await archive.finalize();
+});
+
 // ── Socket.io ─────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log(`🔌 ${socket.id}`);
@@ -619,7 +680,7 @@ io.on('connection', (socket) => {
     socket.data.currentEventId = eventId;
 
     const [photos, musicRequests, event] = await Promise.all([
-      Photo.findAll({ where: { event_id: eventId }, order: [['timestamp', 'DESC']], limit: 50 }),
+      Photo.findAll({ where: { event_id: eventId, hidden: false, deleted_at: null }, order: [['timestamp', 'DESC']], limit: 50 }),
       MusicRequest.findAll({ where: { event_id: eventId }, order: [['requested_at', 'ASC']] }),
       Event.findByPk(eventId),
     ]);
