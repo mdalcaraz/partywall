@@ -62,9 +62,37 @@
   transition: all .2s;
   white-space: nowrap;
 }
-.btnDownloadAll:hover {
+.btnDownloadAll:hover:not(:disabled) {
   background: rgba(255,255,255,.13);
   border-color: rgba(255,255,255,.3);
+}
+.btnDownloadAll:disabled {
+  opacity: .35; cursor: default;
+}
+
+.btnSelect {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.2);
+  color: rgba(255,255,255,.6); border-radius: 8px;
+  padding: 7px 14px; font-size: .78rem;
+  font-family: inherit; cursor: pointer;
+  transition: all .2s; white-space: nowrap;
+}
+.btnSelect:hover { border-color: rgba(255,255,255,.4); color: #f0f0f0; }
+
+.btnCancelSelect {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.15);
+  color: rgba(255,255,255,.45); border-radius: 8px;
+  padding: 7px 14px; font-size: .78rem;
+  font-family: inherit; cursor: pointer;
+  transition: all .2s; white-space: nowrap;
+}
+.btnCancelSelect:hover { color: rgba(255,255,255,.75); }
+
+.selectCount {
+  font-size: .78rem; color: rgba(255,255,255,.5);
+  white-space: nowrap;
 }
 
 /* ── Empty state ── */
@@ -101,6 +129,11 @@
   overflow: hidden;
   background: #1a1a1a;
   cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color .15s, transform .3s;
+}
+.photoCardSelected {
+  border-color: rgba(255,255,255,.8);
 }
 .photoImg {
   width: 100%; height: 100%;
@@ -130,6 +163,28 @@
   transition: background .2s;
 }
 .btnDownload:hover { background: rgba(255,255,255,.28); }
+
+/* ── Selection mode ── */
+.selectOverlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,.25);
+  display: flex; align-items: flex-start;
+  justify-content: flex-end; padding: 8px;
+  transition: background .15s;
+}
+.selectOverlayActive { background: rgba(255,255,255,.15); }
+
+.checkCircle {
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.7);
+  background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; font-weight: 700; color: white;
+  transition: all .15s;
+}
+.selectOverlayActive .checkCircle {
+  background: white; border-color: white; color: #111;
+}
 
 /* ── Coming soon (video) ── */
 .comingSoon {

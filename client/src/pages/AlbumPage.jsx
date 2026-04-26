@@ -16,10 +16,12 @@ function IgIcon() {
 
 export default function AlbumPage() {
   const { eventId } = useParams()
-  const [info, setInfo]         = useState(null)
-  const [photos, setPhotos]     = useState([])
-  const [loading, setLoading]   = useState(true)
+  const [info, setInfo]           = useState(null)
+  const [photos, setPhotos]       = useState([])
+  const [loading, setLoading]     = useState(true)
   const [showTerms, setShowTerms] = useState(false)
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected]   = useState(new Set())
   const socketRef = useRef(null)
 
   useEffect(() => {
@@ -45,6 +47,21 @@ export default function AlbumPage() {
       socket.off('foto_eliminada', onEliminada)
     }
   }, [eventId])
+
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const cancelSelect = () => { setSelecting(false); setSelected(new Set()) }
+
+  const downloadSelected = () => {
+    const ids = [...selected].join(',')
+    window.location.href = `${BASE}api/e/${eventId}/album/download?ids=${ids}`
+  }
 
   const downloadAll = () => {
     window.location.href = `${BASE}api/e/${eventId}/album/download`
@@ -74,10 +91,32 @@ export default function AlbumPage() {
         </div>
         <div className={s.headerActions}>
           <span className={s.photoCount}>{photos.length} foto{photos.length !== 1 ? 's' : ''}</span>
-          {photos.length > 0 && (
-            <button className={s.btnDownloadAll} onClick={downloadAll}>
-              ↓ Descargar todo
-            </button>
+          {photos.length > 0 && !selecting && (
+            <>
+              <button className={s.btnSelect} onClick={() => setSelecting(true)}>
+                Seleccionar
+              </button>
+              <button className={s.btnDownloadAll} onClick={downloadAll}>
+                ↓ Descargar todo
+              </button>
+            </>
+          )}
+          {selecting && (
+            <>
+              <span className={s.selectCount}>
+                {selected.size} seleccionada{selected.size !== 1 ? 's' : ''}
+              </span>
+              <button
+                className={s.btnDownloadAll}
+                onClick={downloadSelected}
+                disabled={selected.size === 0}
+              >
+                ↓ Descargar ({selected.size})
+              </button>
+              <button className={s.btnCancelSelect} onClick={cancelSelect}>
+                Cancelar
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -90,21 +129,34 @@ export default function AlbumPage() {
         </div>
       ) : (
         <div className={s.grid}>
-          {photos.map(photo => (
-            <div key={photo.id} className={s.photoCard}>
-              <img src={photo.url} alt="" loading="lazy" className={s.photoImg} />
-              <div className={s.photoOverlay}>
-                <a
-                  href={photo.url}
-                  download={photo.filename}
-                  className={s.btnDownload}
-                  onClick={e => e.stopPropagation()}
-                >
-                  ↓
-                </a>
+          {photos.map(photo => {
+            const isSelected = selected.has(photo.id)
+            return (
+              <div
+                key={photo.id}
+                className={`${s.photoCard} ${isSelected ? s.photoCardSelected : ''}`}
+                onClick={selecting ? () => toggleSelect(photo.id) : undefined}
+              >
+                <img src={photo.url} alt="" loading="lazy" className={s.photoImg} />
+                {selecting ? (
+                  <div className={`${s.selectOverlay} ${isSelected ? s.selectOverlayActive : ''}`}>
+                    <div className={s.checkCircle}>{isSelected ? '✓' : ''}</div>
+                  </div>
+                ) : (
+                  <div className={s.photoOverlay}>
+                    <a
+                      href={photo.url}
+                      download={photo.filename}
+                      className={s.btnDownload}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      ↓
+                    </a>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

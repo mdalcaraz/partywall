@@ -646,6 +646,13 @@ app.get(`${BASE}/api/e/:eventId/album/download`, async (req, res) => {
     order: [['timestamp', 'ASC']],
   });
 
+  const { ids } = req.query;
+  const idList  = ids ? ids.split(',').filter(Boolean) : null;
+  const where   = { event_id: req.params.eventId, deleted_at: null };
+  if (idList?.length) where.id = idList;
+
+  const photos = await Photo.findAll({ where, order: [['timestamp', 'ASC']] });
+
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="album_${event.name.replace(/[^a-z0-9]/gi, '_')}.zip"`);
 
