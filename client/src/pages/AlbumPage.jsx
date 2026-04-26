@@ -79,46 +79,42 @@ export default function AlbumPage() {
   const logo = info?.brand_logo_url || `${BASE}logo.png`
   const ig   = info?.brand_instagram
 
+  const dateStr = info?.date
+    ? new Date(info.date).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null
+
   return (
     <div className={s.page}>
       {/* ── Header ── */}
       <div className={s.header}>
-        <img src={logo} alt="logo" className={s.logo} />
-        <div className={s.headerInfo}>
-          {info?.name && <div className={s.eventName}>{info.name}</div>}
-          {info?.date  && <div className={s.eventMeta}>{new Date(info.date).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}</div>}
-          {info?.location && <div className={s.eventMeta}>{info.location}</div>}
+        <div className={s.headerRow}>
+          <img src={logo} alt="logo" className={s.logo} />
+          <div className={s.headerActions}>
+            {photos.length > 0 && !selecting && (
+              <>
+                <button className={s.btnSelect} onClick={() => setSelecting(true)}>
+                  Seleccionar
+                </button>
+                <button className={s.btnDownloadAll} onClick={downloadAll}>
+                  ↓ Descargar todo
+                </button>
+              </>
+            )}
+            {selecting && (
+              <button className={s.btnCancel} onClick={cancelSelect}>
+                ✕ Cancelar
+              </button>
+            )}
+          </div>
         </div>
-        <div className={s.headerActions}>
-          <span className={s.photoCount}>{photos.length} foto{photos.length !== 1 ? 's' : ''}</span>
-          {photos.length > 0 && !selecting && (
-            <>
-              <button className={s.btnSelect} onClick={() => setSelecting(true)}>
-                Seleccionar
-              </button>
-              <button className={s.btnDownloadAll} onClick={downloadAll}>
-                ↓ Descargar todo
-              </button>
-            </>
-          )}
-          {selecting && (
-            <>
-              <span className={s.selectCount}>
-                {selected.size} seleccionada{selected.size !== 1 ? 's' : ''}
-              </span>
-              <button
-                className={s.btnDownloadAll}
-                onClick={downloadSelected}
-                disabled={selected.size === 0}
-              >
-                ↓ Descargar ({selected.size})
-              </button>
-              <button className={s.btnCancelSelect} onClick={cancelSelect}>
-                Cancelar
-              </button>
-            </>
-          )}
-        </div>
+
+        {(info?.name || dateStr || info?.location) && (
+          <div className={s.headerInfo}>
+            {info?.name     && <span className={s.eventName}>{info.name}</span>}
+            {dateStr        && <span className={s.eventMeta}>{dateStr}</span>}
+            {info?.location && <span className={s.eventMeta}>{info.location}</span>}
+          </div>
+        )}
       </div>
 
       {/* ── Grid ── */}
@@ -134,13 +130,16 @@ export default function AlbumPage() {
             return (
               <div
                 key={photo.id}
-                className={`${s.photoCard} ${isSelected ? s.photoCardSelected : ''}`}
+                className={`${s.photoCard} ${selecting ? s.photoCardSelecting : ''} ${isSelected ? s.photoCardSelected : ''}`}
                 onClick={selecting ? () => toggleSelect(photo.id) : undefined}
               >
                 <img src={photo.url} alt="" loading="lazy" className={s.photoImg} />
+
                 {selecting ? (
-                  <div className={`${s.selectOverlay} ${isSelected ? s.selectOverlayActive : ''}`}>
-                    <div className={s.checkCircle}>{isSelected ? '✓' : ''}</div>
+                  <div className={s.checkWrap}>
+                    <div className={`${s.checkCircle} ${isSelected ? s.checkCircleActive : ''}`}>
+                      {isSelected && '✓'}
+                    </div>
                   </div>
                 ) : (
                   <div className={s.photoOverlay}>
@@ -182,6 +181,24 @@ export default function AlbumPage() {
           <button className={s.termsLink} onClick={() => setShowTerms(true)}>Términos y Condiciones</button>
         </span>
       </footer>
+
+      {/* ── Selection action bar ── */}
+      {selecting && (
+        <div className={s.selectBar}>
+          <span className={s.selectBarCount}>
+            {selected.size === 0
+              ? 'Tocá las fotos para elegir'
+              : `${selected.size} foto${selected.size !== 1 ? 's' : ''} seleccionada${selected.size !== 1 ? 's' : ''}`}
+          </span>
+          <button
+            className={s.btnDownloadSelected}
+            onClick={downloadSelected}
+            disabled={selected.size === 0}
+          >
+            ↓ Descargar{selected.size > 0 ? ` (${selected.size})` : ''}
+          </button>
+        </div>
+      )}
 
       {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
     </div>

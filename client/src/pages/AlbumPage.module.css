@@ -25,74 +25,87 @@
 
 /* ── Header ── */
 .header {
-  display: flex; align-items: center; gap: 16px;
-  padding: 16px 24px;
-  background: rgba(255,255,255,.03);
-  border-bottom: 1px solid rgba(255,255,255,.06);
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px 20px;
+  background: rgba(10,10,10,.85);
+  border-bottom: 1px solid rgba(255,255,255,.07);
   position: sticky; top: 0; z-index: 20;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
 }
+
+.headerRow {
+  display: flex; align-items: center; gap: 12px;
+}
+
 .logo {
-  height: 44px; flex-shrink: 0;
+  height: 38px; flex-shrink: 0;
   object-fit: contain;
 }
+
 .headerInfo {
-  flex: 1; min-width: 0;
-  display: flex; flex-direction: column; gap: 2px;
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 4px 10px;
+  padding-left: 2px;
 }
 .eventName {
-  font-size: 1rem; font-weight: 600;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: .88rem; font-weight: 600;
+  color: rgba(255,255,255,.85);
 }
 .eventMeta {
-  font-size: .76rem; color: rgba(255,255,255,.45);
+  font-size: .75rem; color: rgba(255,255,255,.38);
 }
+.eventMeta + .eventMeta::before {
+  content: '·';
+  margin-right: 10px;
+  color: rgba(255,255,255,.2);
+}
+
+/* ── Header actions ── */
 .headerActions {
-  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
-}
-.photoCount {
-  font-size: .76rem; color: rgba(255,255,255,.4);
-}
-.btnDownloadAll {
-  background: rgba(255,255,255,.07);
-  border: 1px solid rgba(255,255,255,.15);
-  color: #f0f0f0; border-radius: 8px;
-  padding: 7px 14px; font-size: .78rem;
-  font-family: inherit; cursor: pointer;
-  transition: all .2s;
-  white-space: nowrap;
-}
-.btnDownloadAll:hover:not(:disabled) {
-  background: rgba(255,255,255,.13);
-  border-color: rgba(255,255,255,.3);
-}
-.btnDownloadAll:disabled {
-  opacity: .35; cursor: default;
+  display: flex; align-items: center; gap: 8px;
+  margin-left: auto; flex-shrink: 0;
 }
 
 .btnSelect {
+  height: 34px; padding: 0 14px;
   background: transparent;
-  border: 1px solid rgba(255,255,255,.2);
-  color: rgba(255,255,255,.6); border-radius: 8px;
-  padding: 7px 14px; font-size: .78rem;
+  border: 1px solid rgba(255,255,255,.18);
+  color: rgba(255,255,255,.65);
+  border-radius: 8px; font-size: .78rem;
   font-family: inherit; cursor: pointer;
   transition: all .2s; white-space: nowrap;
 }
-.btnSelect:hover { border-color: rgba(255,255,255,.4); color: #f0f0f0; }
+.btnSelect:hover {
+  border-color: rgba(255,255,255,.35);
+  color: #f0f0f0;
+}
 
-.btnCancelSelect {
+.btnDownloadAll {
+  height: 34px; padding: 0 14px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14);
+  color: #f0f0f0;
+  border-radius: 8px; font-size: .78rem;
+  font-family: inherit; cursor: pointer;
+  transition: all .2s; white-space: nowrap;
+}
+.btnDownloadAll:hover {
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.28);
+}
+
+.btnCancel {
+  height: 34px; padding: 0 14px;
   background: transparent;
   border: 1px solid rgba(255,255,255,.15);
-  color: rgba(255,255,255,.45); border-radius: 8px;
-  padding: 7px 14px; font-size: .78rem;
+  color: rgba(255,255,255,.55);
+  border-radius: 8px; font-size: .78rem;
   font-family: inherit; cursor: pointer;
   transition: all .2s; white-space: nowrap;
 }
-.btnCancelSelect:hover { color: rgba(255,255,255,.75); }
-
-.selectCount {
-  font-size: .78rem; color: rgba(255,255,255,.5);
-  white-space: nowrap;
+.btnCancel:hover {
+  border-color: rgba(255,80,80,.5);
+  color: rgba(255,100,100,.9);
 }
 
 /* ── Empty state ── */
@@ -108,17 +121,21 @@
 
 /* ── Photo grid ── */
 .grid {
-  padding: 24px;
+  padding: 16px 20px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
   flex: 1;
+  /* space for bottom bar when selecting */
+  padding-bottom: 100px;
 }
+
 @media (max-width: 600px) {
   .grid {
-    padding: 12px;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 8px;
+    padding: 10px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding-bottom: 100px;
   }
 }
 
@@ -128,20 +145,23 @@
   border-radius: 10px;
   overflow: hidden;
   background: #1a1a1a;
-  cursor: pointer;
   border: 2px solid transparent;
-  transition: border-color .15s, transform .3s;
+  transition: border-color .15s;
 }
+.photoCard:not(.photoCardSelecting) { cursor: default; }
+.photoCardSelecting { cursor: pointer; }
+
 .photoCardSelected {
-  border-color: rgba(255,255,255,.8);
+  border-color: #fff;
 }
 .photoImg {
   width: 100%; height: 100%;
   object-fit: cover; display: block;
   transition: transform .3s;
 }
-.photoCard:hover .photoImg { transform: scale(1.04); }
+.photoCard:not(.photoCardSelecting):hover .photoImg { transform: scale(1.04); }
 
+/* normal overlay (download) */
 .photoOverlay {
   position: absolute; inset: 0;
   background: linear-gradient(to top, rgba(0,0,0,.7) 0%, transparent 55%);
@@ -164,49 +184,83 @@
 }
 .btnDownload:hover { background: rgba(255,255,255,.28); }
 
-/* ── Selection mode ── */
-.selectOverlay {
+/* ── Checkmark (selection mode) ── */
+.checkWrap {
   position: absolute; inset: 0;
-  background: rgba(0,0,0,.25);
-  display: flex; align-items: flex-start;
-  justify-content: flex-end; padding: 8px;
+  display: flex; align-items: flex-start; justify-content: flex-end;
+  padding: 8px;
+  background: rgba(0,0,0,.2);
   transition: background .15s;
 }
-.selectOverlayActive { background: rgba(255,255,255,.15); }
+.photoCardSelected .checkWrap {
+  background: rgba(255,255,255,.12);
+}
 
 .checkCircle {
-  width: 24px; height: 24px; border-radius: 50%;
-  border: 2px solid rgba(255,255,255,.7);
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.65);
   background: transparent;
   display: flex; align-items: center; justify-content: center;
-  font-size: .75rem; font-weight: 700; color: white;
+  font-size: .7rem; font-weight: 700; color: #111;
   transition: all .15s;
+  flex-shrink: 0;
 }
-.selectOverlayActive .checkCircle {
-  background: white; border-color: white; color: #111;
+.checkCircleActive {
+  background: #fff;
+  border-color: #fff;
+}
+
+/* ── Sticky selection bar ── */
+.selectBar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 20px;
+  background: rgba(18,18,18,.96);
+  border-top: 1px solid rgba(255,255,255,.1);
+  backdrop-filter: blur(20px);
+  safe-area-inset-bottom: env(safe-area-inset-bottom);
+}
+.selectBarCount {
+  flex: 1; font-size: .82rem; color: rgba(255,255,255,.5);
+}
+.btnDownloadSelected {
+  height: 40px; padding: 0 22px;
+  background: #f0f0f0; color: #111;
+  border: none; border-radius: 10px;
+  font-size: .84rem; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+  transition: all .2s; white-space: nowrap;
+}
+.btnDownloadSelected:hover:not(:disabled) {
+  background: #fff;
+}
+.btnDownloadSelected:disabled {
+  background: rgba(255,255,255,.15);
+  color: rgba(255,255,255,.3);
+  cursor: default;
 }
 
 /* ── Coming soon (video) ── */
 .comingSoon {
-  display: flex; align-items: center; gap: 16px;
-  margin: 0 24px 24px;
-  padding: 16px 20px;
+  display: flex; align-items: center; gap: 14px;
+  margin: 0 20px 20px;
+  padding: 14px 18px;
   background: rgba(255,255,255,.03);
   border: 1px solid rgba(255,255,255,.07);
   border-radius: 14px;
 }
-.comingSoonIcon { font-size: 1.8rem; flex-shrink: 0; }
+.comingSoonIcon { font-size: 1.6rem; flex-shrink: 0; }
 .comingSoonText {
-  flex: 1; display: flex; flex-direction: column; gap: 2px;
+  flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0;
 }
 .comingSoonTitle {
-  font-size: .88rem; font-weight: 600; color: rgba(255,255,255,.7);
+  font-size: .84rem; font-weight: 600; color: rgba(255,255,255,.65);
 }
 .comingSoonSub {
-  font-size: .75rem; color: rgba(255,255,255,.35);
+  font-size: .72rem; color: rgba(255,255,255,.3);
 }
 .comingSoonBadge {
-  font-size: .68rem; font-weight: 700;
+  font-size: .65rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: .08em;
   color: #b8860b;
   background: rgba(184,134,11,.12);
