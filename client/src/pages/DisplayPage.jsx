@@ -58,6 +58,7 @@ export default function DisplayPage() {
   const { eventId } = useParams()
   const { urlA, urlB, activeSlot, showImage, onLoad } = useImageCrossfade()
   const [hasPhoto, setHasPhoto]         = useState(false)
+  const [currentVideo, setCurrentVideo] = useState(null)
   const [ssActive, setSsActive]         = useState(false)
   const [ssInterval, setSsInterval]     = useState(5000)
   const [ssProgress, setSsProgress]     = useState(0)
@@ -89,7 +90,8 @@ export default function DisplayPage() {
       if (current) { showImage(current.url); setHasPhoto(true) }
       if (mr) setMusicRequests(mr)
     }
-    const onMostrar   = (photo) => { if (!photo) { showImage(null); setHasPhoto(false); return }; showImage(photo.url); setHasPhoto(true) }
+    const onMostrar      = (photo) => { if (!photo) { showImage(null); setHasPhoto(false); return }; setCurrentVideo(null); showImage(photo.url); setHasPhoto(true) }
+    const onMostrarVideo = (video) => { if (!video) { setCurrentVideo(null); return }; showImage(null); setHasPhoto(false); setCurrentVideo(video) }
     const onNueva     = () => showNotif('📸 Nueva foto recibida')
     const onSlideshow = ({ active, interval }) => { setSsActive(active); if (active && interval) setSsInterval(interval) }
 
@@ -100,6 +102,7 @@ export default function DisplayPage() {
 
     socket.on('estado_inicial',        onEstado)
     socket.on('mostrar_foto',          onMostrar)
+    socket.on('mostrar_video',         onMostrarVideo)
     socket.on('nueva_foto',            onNueva)
     socket.on('slideshow_estado',      onSlideshow)
     socket.on('music_nueva',           onMusicNueva)
@@ -110,6 +113,7 @@ export default function DisplayPage() {
     return () => {
       socket.off('estado_inicial',        onEstado)
       socket.off('mostrar_foto',          onMostrar)
+      socket.off('mostrar_video',         onMostrarVideo)
       socket.off('nueva_foto',            onNueva)
       socket.off('slideshow_estado',      onSlideshow)
       socket.off('music_nueva',           onMusicNueva)
@@ -156,7 +160,7 @@ export default function DisplayPage() {
         style={{ backgroundImage: (urlA || urlB) ? `url('${activeSlot === 'A' ? urlA : urlB}')` : undefined }}
       />
 
-      <div className={`${s.idleScreen} ${hasPhoto ? s.idleHidden : ''}`}>
+      <div className={`${s.idleScreen} ${(hasPhoto || !!currentVideo) ? s.idleHidden : ''}`}>
         <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Top DJ Group" className={s.idleLogo} />
         <div className={s.idleSub}>Las fotos aparecerán aquí</div>
       </div>
@@ -170,7 +174,19 @@ export default function DisplayPage() {
         </div>
       </div>
 
-      <div className={`${s.infoOverlay} ${hasPhoto ? s.infoShow : ''}`}>
+      {currentVideo && (
+        <div className={s.videoStage}>
+          <video
+            key={currentVideo.id}
+            src={currentVideo.url}
+            autoPlay
+            playsInline
+            className={s.videoPlayer}
+          />
+        </div>
+      )}
+
+      <div className={`${s.infoOverlay} ${(hasPhoto || !!currentVideo) ? s.infoShow : ''}`}>
         <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Top DJ Group" className={s.brandLogo} />
         <span className={s.igHandle}>@topdjgroup</span>
       </div>

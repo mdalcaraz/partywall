@@ -11,7 +11,9 @@ const os       = require('os');
 const crypto   = require('crypto');
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
-const { sequelize, Event, Photo, MusicRequest } = require('./models');
+const ffmpeg   = require('fluent-ffmpeg');
+const sharp    = require('sharp');
+const { sequelize, Event, Photo, MusicRequest, Video } = require('./models');
 
 // ── Config ────────────────────────────────────────────────────────────────
 function getLocalIP() {
@@ -63,6 +65,12 @@ function requireAnyAdmin(req, res, next) {
 function normalize(photo) {
   if (!photo) return null;
   const p = photo.toJSON ? photo.toJSON() : photo;
+  return { ...p, inSlideshow: !!p.in_slideshow, hidden: !!p.hidden };
+}
+
+function normalizeVideo(v) {
+  if (!v) return null;
+  const p = v.toJSON ? v.toJSON() : v;
   return { ...p, inSlideshow: !!p.in_slideshow, hidden: !!p.hidden };
 }
 
@@ -139,6 +147,81 @@ app.use(express.json());
 app.get('/', (req, res) => res.redirect(301, `${BASE}/`));
 
 // ── Multer ────────────────────────────────────────────────────────────────
+// ── Multer: videos ────────────────────────────────────────────────────────
+const videoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = `storage/${req.params.eventId}/videos/raw`;
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.mp4';
+    cb(null, `raw_${Date.now()}${ext}`);
+  },
+});
+const videoUpload = multer({
+  storage: videoStorage,
+  limits: { fileSize: 1024 * 1024 * 1024 }, // 1 GB — ffmpeg comprime el output
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('video/')) cb(null, true);
+    else cb(new Error('Solo videos'));
+  },
+});
+
+async function processVideo(video, rawPath, eventId) {
+  const id       = video.id;
+  const outDir   = `storage/${eventId}/videos`;
+  const thumbDir = `storage/${eventId}/videos/thumbs`;
+  fs.mkdirSync(outDir,   { recursive: true });
+  fs.mkdirSync(thumbDir, { recursive: true });
+
+  const outputPath = `${outDir}/${id}.mp4`;
+  const thumbPath  = `${thumbDir}/${id}.jpg`;
+
+  try {
+    await new Promise((resolve, reject) => {
+      ffmpeg(rawPath)
+        .videoCodec('libx264')
+        .audioCodec('aac')
+        .audioBitrate('128k')
+        .outputOptions(['-crf 23', '-preset fast', '-movflags +faststart', '-t 60'])
+        .videoFilter("scale='min(iw,1920)':'min(ih,1080)':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2")
+        .save(outputPath)
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    const meta = await new Promise((resolve, reject) =>
+      ffmpeg.ffprobe(outputPath, (err, d) => err ? reject(err) : resolve(d))
+    );
+    const duration = meta.format.duration;
+
+    await new Promise((resolve) => {
+      ffmpeg(outputPath)
+        .screenshots({ timestamps: ['00:00:01'], filename: `${id}.jpg`, folder: thumbDir, size: '1280x?' })
+        .on('end', resolve)
+        .on('error', resolve);
+    });
+
+    const url          = `${BASE}/storage/${eventId}/videos/${id}.mp4`;
+    const thumbnailUrl = fs.existsSync(thumbPath) ? `${BASE}/storage/${eventId}/videos/thumbs/${id}.jpg` : null;
+
+    await video.update({ status: 'ready', filename: `${id}.mp4`, url, thumbnail_url: thumbnailUrl, duration });
+    try { fs.unlinkSync(rawPath); } catch {}
+
+    const ready = await Video.findByPk(id);
+    io.to(`event:${eventId}`).emit('video_lista', normalizeVideo(ready));
+    console.log(`🎬 [${eventId}] Video listo: ${id}`);
+
+  } catch (err) {
+    console.error(`❌ [${eventId}] Video error: ${err.message}`);
+    await video.update({ status: 'error' });
+    try { fs.unlinkSync(rawPath); } catch {}
+    io.to(`event:${eventId}`).emit('video_error', { id: video.id });
+  }
+}
+
+// ── Multer: fotos ─────────────────────────────────────────────────────────
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = `storage/${req.params.eventId}/uploads`;
@@ -152,7 +235,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 15 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB raw; sharp comprime antes de guardar
+
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
     else cb(new Error('Solo imágenes'));
@@ -324,6 +408,11 @@ app.patch(`${BASE}/api/events/:id/music`, requireSuperAdmin, async (req, res) =>
   res.json({ success: true });
 });
 
+app.patch(`${BASE}/api/events/:id/video`, requireSuperAdmin, async (req, res) => {
+  await Event.update({ video_enabled: !!req.body.enabled }, { where: { id: req.params.id } });
+  res.json({ success: true });
+});
+
 app.delete(`${BASE}/api/events/:id`, requireSuperAdmin, async (req, res) => {
   const event = await Event.findByPk(req.params.id);
   if (!event) return res.status(404).json({ error: 'No encontrado' });
@@ -393,8 +482,88 @@ app.delete(`${BASE}/api/e/:eventId/photos/:photoId`, requireAnyAdmin, async (req
   res.json({ success: true });
 });
 
-// ── API: Upload (public, rate-limited) ────────────────────────────────────
-app.post(`${BASE}/api/e/:eventId/upload`, upload.single('photo'), async (req, res) => {
+// ── API: Videos ──────────────────────────────────────────────────────────
+app.post(`${BASE}/api/e/:eventId/videos/upload`, (req, res, next) => {
+  videoUpload.single('video')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE')
+        return res.status(413).json({ error: 'El video es demasiado grande (máx. 1 GB)' });
+      return res.status(400).json({ error: err.message || 'Error al subir el archivo' });
+    }
+    next();
+  });
+}, async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Sin archivo' });
+
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event || !event.active) {
+    try { fs.unlinkSync(req.file.path); } catch {}
+    return res.status(404).json({ error: 'Evento no encontrado o inactivo' });
+  }
+  if (!event.video_enabled) {
+    try { fs.unlinkSync(req.file.path); } catch {}
+    return res.status(403).json({ error: 'Video no habilitado para este evento' });
+  }
+
+  const id        = crypto.randomBytes(12).toString('hex');
+  const timestamp = new Date().toISOString();
+
+  const video = await Video.create({
+    id, event_id: req.params.eventId,
+    original_filename: req.file.originalname,
+    filename: null, url: null, thumbnail_url: null, duration: null,
+    status: 'processing', timestamp,
+  });
+
+  io.to(`event:${req.params.eventId}`).emit('video_nueva', normalizeVideo(video));
+  processVideo(video, req.file.path, req.params.eventId).catch(() => {});
+  console.log(`🎬 [${req.params.eventId}] Procesando ${req.file.originalname}`);
+  res.json({ success: true, video: normalizeVideo(video) });
+});
+
+app.get(`${BASE}/api/e/:eventId/videos/all`, requireAnyAdmin, async (req, res) => {
+  const videos = await Video.findAll({
+    where: { event_id: req.params.eventId, deleted_at: null },
+    order: [['timestamp', 'DESC']],
+  });
+  res.json(videos.map(normalizeVideo));
+});
+
+app.patch(`${BASE}/api/e/:eventId/videos/:videoId/hide`, requireAnyAdmin, async (req, res) => {
+  const video = await Video.findOne({ where: { id: req.params.videoId, event_id: req.params.eventId, deleted_at: null } });
+  if (!video) return res.status(404).json({ error: 'No encontrado' });
+  await video.update({ hidden: !video.hidden });
+  io.to(`event:${req.params.eventId}`).emit('video_ocultada', { id: video.id, hidden: video.hidden });
+  res.json({ success: true, hidden: video.hidden });
+});
+
+app.patch(`${BASE}/api/e/:eventId/videos/:videoId/slideshow`, requireAnyAdmin, async (req, res) => {
+  const video = await Video.findOne({ where: { id: req.params.videoId, event_id: req.params.eventId, deleted_at: null } });
+  if (!video) return res.status(404).json({ error: 'No encontrado' });
+  await video.update({ in_slideshow: !video.in_slideshow });
+  io.to(`event:${req.params.eventId}`).emit('video_actualizada', { id: video.id, inSlideshow: video.in_slideshow });
+  res.json({ success: true, inSlideshow: video.in_slideshow });
+});
+
+app.delete(`${BASE}/api/e/:eventId/videos/:videoId`, requireAnyAdmin, async (req, res) => {
+  const video = await Video.findOne({ where: { id: req.params.videoId, event_id: req.params.eventId, deleted_at: null } });
+  if (!video) return res.status(404).json({ error: 'No encontrado' });
+  await video.update({ deleted_at: new Date(), in_slideshow: false });
+  io.to(`event:${req.params.eventId}`).emit('video_eliminada', { id: req.params.videoId });
+  res.json({ success: true });
+});
+
+// ── API: Upload fotos (public, rate-limited) ──────────────────────────────
+app.post(`${BASE}/api/e/:eventId/upload`, (req, res, next) => {
+  upload.single('photo')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE')
+        return res.status(413).json({ error: 'La imagen es demasiado grande (máx. 50 MB)' });
+      return res.status(400).json({ error: err.message || 'Error al subir la imagen' });
+    }
+    next();
+  });
+}, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Sin archivo' });
 
   const event = await Event.findByPk(req.params.eventId);
@@ -409,15 +578,31 @@ app.post(`${BASE}/api/e/:eventId/upload`, upload.single('photo'), async (req, re
     return res.status(429).json({ error: 'Límite alcanzado', retryAfter: limit.retryAfter });
   }
 
-  const id        = path.basename(req.file.filename, path.extname(req.file.filename));
-  const url       = `${BASE}/storage/${req.params.eventId}/uploads/${req.file.filename}`;
+  // Comprimir con sharp: max 2000px, JPEG 85%, sin EXIF
+  const rawPath  = req.file.path;
+  const id       = path.basename(req.file.filename, path.extname(req.file.filename));
+  const filename = `${id}.jpg`;
+  const outPath  = path.join(path.dirname(rawPath), filename);
+  try {
+    await sharp(rawPath)
+      .rotate()                          // respeta orientación EXIF
+      .resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85, mozjpeg: true })
+      .toFile(outPath);
+    if (rawPath !== outPath) fs.unlinkSync(rawPath);
+  } catch {
+    // Si sharp falla, usamos el archivo original tal cual
+    if (rawPath !== outPath) try { fs.renameSync(rawPath, outPath); } catch {}
+  }
+
+  const url       = `${BASE}/storage/${req.params.eventId}/uploads/${filename}`;
   const timestamp = new Date().toISOString();
 
-  const newPhoto = await Photo.create({ id, event_id: req.params.eventId, filename: req.file.filename, url, timestamp });
+  const newPhoto = await Photo.create({ id, event_id: req.params.eventId, filename, url, timestamp });
   const photo    = normalize(newPhoto);
 
   io.to(`event:${req.params.eventId}`).emit('nueva_foto', photo);
-  console.log(`📸 [${req.params.eventId}] ${req.file.filename}`);
+  console.log(`📸 [${req.params.eventId}] ${filename}`);
 
   const peekKey   = `${req.params.eventId}:${clientId(req)}`;
   const afterSend = peekRateLimit(uploadLimits, peekKey, event.photo_limit || 3, (event.photo_window || 60) * 1000);
@@ -626,15 +811,16 @@ app.get(`${BASE}/api/e/:eventId/album/info`, async (req, res) => {
     location:        event.location     || null,
     brand_logo_url:  event.brand_logo_url  || null,
     brand_instagram: event.brand_instagram || null,
+    video_enabled:   !!event.video_enabled,
   });
 });
 
 app.get(`${BASE}/api/e/:eventId/album`, async (req, res) => {
-  const photos = await Photo.findAll({
-    where: { event_id: req.params.eventId, deleted_at: null },
-    order: [['timestamp', 'ASC']],
-  });
-  res.json(photos.map(normalize));
+  const [photos, videos] = await Promise.all([
+    Photo.findAll({ where: { event_id: req.params.eventId, deleted_at: null }, order: [['timestamp', 'DESC']] }),
+    Video.findAll({ where: { event_id: req.params.eventId, deleted_at: null, status: 'ready' }, order: [['timestamp', 'DESC']] }),
+  ]);
+  res.json({ photos: photos.map(normalize), videos: videos.map(normalizeVideo) });
 });
 
 app.get(`${BASE}/api/e/:eventId/album/download`, async (req, res) => {
@@ -660,6 +846,15 @@ app.get(`${BASE}/api/e/:eventId/album/download`, async (req, res) => {
     if (fs.existsSync(filePath)) archive.file(filePath, { name: photo.filename });
   }
 
+  // include videos in ZIP (only if downloading all, not partial by id)
+  if (!idList?.length) {
+    const videos = await Video.findAll({ where: { event_id: req.params.eventId, deleted_at: null, status: 'ready' }, order: [['timestamp', 'ASC']] });
+    for (const video of videos) {
+      const filePath = path.join('storage', req.params.eventId, 'videos', video.filename);
+      if (video.filename && fs.existsSync(filePath)) archive.file(filePath, { name: video.filename });
+    }
+  }
+
   await archive.finalize();
 });
 
@@ -681,8 +876,9 @@ io.on('connection', (socket) => {
     socket.join(`event:${eventId}`);
     socket.data.currentEventId = eventId;
 
-    const [photos, musicRequests, event] = await Promise.all([
+    const [photos, videos, musicRequests, event] = await Promise.all([
       Photo.findAll({ where: { event_id: eventId, hidden: false, deleted_at: null }, order: [['timestamp', 'DESC']], limit: 50 }),
+      Video.findAll({ where: { event_id: eventId, hidden: false, deleted_at: null, status: 'ready' }, order: [['timestamp', 'DESC']], limit: 20 }),
       MusicRequest.findAll({ where: { event_id: eventId }, order: [['requested_at', 'ASC']] }),
       Event.findByPk(eventId),
     ]);
@@ -692,6 +888,7 @@ io.on('connection', (socket) => {
     socket.emit('estado_inicial', {
       current:        null,
       photos:         photos.map(normalize),
+      videos:         videos.map(normalizeVideo),
       slideshow:      { active: ss.active, interval: ss.interval },
       musicRequests:  musicRequests.map(r => r.toJSON()),
       musicEnabled:   event?.music_enabled ?? false,
@@ -703,6 +900,14 @@ io.on('connection', (socket) => {
     if (!canControl(socket, eventId)) return;
     stopSlideshow(eventId);
     io.to(`event:${eventId}`).emit('mostrar_foto', photo);
+    io.to(`event:${eventId}`).emit('mostrar_video', null); // clear video
+  });
+
+  socket.on('proyectar_video', ({ eventId, video }) => {
+    if (!canControl(socket, eventId)) return;
+    stopSlideshow(eventId);
+    io.to(`event:${eventId}`).emit('mostrar_video', video);
+    io.to(`event:${eventId}`).emit('mostrar_foto', null); // clear photo
   });
 
   socket.on('slideshow_start', ({ eventId, interval }) => {

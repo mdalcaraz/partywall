@@ -9,6 +9,7 @@ const sequelize = new Sequelize(config.database, config.username, config.passwor
 const Event        = require('./Event')(sequelize, Sequelize.DataTypes);
 const Photo        = require('./Photo')(sequelize, Sequelize.DataTypes);
 const MusicRequest = require('./MusicRequest')(sequelize, Sequelize.DataTypes);
+const Video        = require('./Video')(sequelize, Sequelize.DataTypes);
 
 Event.hasMany(Photo,        { foreignKey: 'event_id', onDelete: 'CASCADE' });
 Photo.belongsTo(Event,      { foreignKey: 'event_id' });
@@ -16,4 +17,7 @@ Photo.belongsTo(Event,      { foreignKey: 'event_id' });
 Event.hasMany(MusicRequest, { foreignKey: 'event_id', onDelete: 'CASCADE' });
 MusicRequest.belongsTo(Event, { foreignKey: 'event_id' });
 
-module.exports = { sequelize, Sequelize, Event, Photo, MusicRequest };
+Event.hasMany(Video,        { foreignKey: 'event_id', onDelete: 'CASCADE' });
+Video.belongsTo(Event,      { foreignKey: 'event_id' });
+
+module.exports = { sequelize, Sequelize, Event, Photo, MusicRequest, Video };

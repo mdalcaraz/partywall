@@ -23,6 +23,8 @@ export default function AdminPage() {
   const [toast, setToast]           = useState({ msg: '', type: '', visible: false })
   const [panelMode, setPanelMode]   = useState('proyeccion') // 'proyeccion' | 'album'
   const [albumPhotos, setAlbumPhotos] = useState([])
+  const [albumVideos, setAlbumVideos] = useState([])
+  const [videoModal, setVideoModal]   = useState(null) // null | { video }
   const [showQrs, setShowQrs]       = useState(false)
   const toastTimer = useRef(null)
   const socketRef  = useRef(null)
@@ -75,6 +77,14 @@ export default function AdminPage() {
       setAlbumPhotos((prev) => prev.map((p) => p.id === id ? { ...p, hidden } : p))
     }
 
+    // Video socket events
+    const onVideoNueva = (video) => { setAlbumVideos(prev => [video, ...prev]); showToast('🎬 Nuevo video recibido', 'green') }
+    const onVideoLista = (video) => setAlbumVideos(prev => prev.map(v => v.id === video.id ? video : v))
+    const onVideoElim  = ({ id }) => {
+      setAlbumVideos(prev => prev.filter(v => v.id !== id))
+      setVideoModal(m => m?.video?.id === id ? null : m)
+    }
+
     // Music socket events
     const onMusicNueva       = (r)               => { setMusicRequests(prev => [...prev, r]); showToast(`🎵 ${r.artist_name} — ${r.track_name}`, 'green') }
     const onMusicActualizada = ({ id, status })  => setMusicRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r))
@@ -92,6 +102,9 @@ export default function AdminPage() {
     socket.on('slideshow_estado',      onSlideshow)
     socket.on('foto_actualizada',      onActualizada)
     socket.on('foto_ocultada',         onOcultada)
+    socket.on('video_nueva',           onVideoNueva)
+    socket.on('video_lista',           onVideoLista)
+    socket.on('video_eliminada',       onVideoElim)
     socket.on('music_nueva',           onMusicNueva)
     socket.on('music_actualizada',     onMusicActualizada)
     socket.on('music_eliminada',       onMusicEliminada)
@@ -108,6 +121,9 @@ export default function AdminPage() {
       socket.off('slideshow_estado',      onSlideshow)
       socket.off('foto_actualizada',      onActualizada)
       socket.off('foto_ocultada',         onOcultada)
+      socket.off('video_nueva',           onVideoNueva)
+      socket.off('video_lista',           onVideoLista)
+      socket.off('video_eliminada',       onVideoElim)
       socket.off('music_nueva',           onMusicNueva)
       socket.off('music_actualizada',     onMusicActualizada)
       socket.off('music_eliminada',       onMusicEliminada)
@@ -120,6 +136,7 @@ export default function AdminPage() {
     if (!eventId) return
     authFetch(`${BASE}api/e/${eventId}/photos`).then((r) => r.json()).then((ph) => setPhotos((prev) => (prev.length ? prev : ph)))
     authFetch(`${BASE}api/e/${eventId}/photos/all`).then((r) => r.json()).then((ph) => { if (Array.isArray(ph)) setAlbumPhotos(ph) })
+    authFetch(`${BASE}api/e/${eventId}/videos/all`).then((r) => r.json()).then((vids) => { if (Array.isArray(vids)) setAlbumVideos(vids) })
     authFetch(`${BASE}api/e/${eventId}/qr`).then((r) => r.json()).then(setQr)
     authFetch(`${BASE}api/e/${eventId}/music/requests`).then((r) => r.json()).then((data) => {
       if (Array.isArray(data)) setMusicRequests(data)
@@ -158,6 +175,22 @@ export default function AdminPage() {
       .then((r) => { if (!r.ok) setAlbumPhotos((prev) => prev.map((p) => p.id === id ? { ...p, hidden: !p.hidden } : p)) })
   }
 
+  // ── Video actions ─────────────────────────────────────────────────────────
+  const projectVideo = (video) => {
+    socketRef.current?.emit('proyectar_video', { eventId, video })
+    setVideoModal(null)
+    showToast('🎬 Video proyectado')
+  }
+  const hideVideo = (id) => {
+    setAlbumVideos((prev) => prev.map((v) => v.id === id ? { ...v, hidden: !v.hidden } : v))
+    authFetch(`${BASE}api/e/${eventId}/videos/${id}/hide`, { method: 'PATCH' })
+      .then((r) => { if (!r.ok) setAlbumVideos((prev) => prev.map((v) => v.id === id ? { ...v, hidden: !v.hidden } : v)) })
+  }
+  const deleteVideo = (id) => {
+    authFetch(`${BASE}api/e/${eventId}/videos/${id}`, { method: 'DELETE' })
+    setVideoModal((m) => (m?.video?.id === id ? null : m))
+  }
+
   // ── Music actions ─────────────────────────────────────────────────────────
   const deleteRequest = async (id) => {
     await authFetch(`${BASE}api/e/${eventId}/music/requests/${id}`, { method: 'DELETE' })
@@ -165,6 +198,7 @@ export default function AdminPage() {
 
   const currentPhoto = photos.find((p) => p.id === currentId) ?? null
   const playlist     = photos.filter((p) => p.inSlideshow)
+  const totalAlbum   = albumPhotos.length + albumVideos.length
 
   return (
     <div className={s.page}>
@@ -176,7 +210,7 @@ export default function AdminPage() {
           </button>
           <button className={`${s.panelTab} ${panelMode === 'album' ? s.panelTabActive : ''}`} onClick={() => setPanelMode('album')}>
             🖼 Álbum
-            {albumPhotos.length > 0 && <span className={s.albumTabCount}>{albumPhotos.length}</span>}
+            {totalAlbum > 0 && <span className={s.albumTabCount}>{totalAlbum}</span>}
           </button>
         </div>
         <div className={s.spacer} />
@@ -200,38 +234,111 @@ export default function AdminPage() {
           <div className={s.albumPanelHeader}>
             <div className={s.panelTitle}>🖼 Álbum del evento</div>
             <span className={s.albumSubtitle}>
-              Las fotos ocultas no aparecen en proyección pero sí en el álbum público. Eliminadas desaparecen de todo.
+              Ocultas: no aparecen en proyección pero sí en el álbum público. Eliminadas: desaparecen de todo.
             </span>
           </div>
-          {albumPhotos.length === 0 ? (
+
+          {totalAlbum === 0 ? (
             <div className={s.emptyState}>
               <div className={s.emptyIcon}>📭</div>
-              <p>No hay fotos en el álbum todavía.</p>
+              <p>No hay contenido en el álbum todavía.</p>
             </div>
           ) : (
-            <div className={s.albumGrid}>
-              {albumPhotos.map((photo) => (
-                <div key={photo.id} className={`${s.albumCard} ${photo.hidden ? s.albumCardHidden : ''}`}>
-                  <img src={photo.url} loading="lazy" alt="" />
-                  {photo.hidden && <div className={s.hiddenBadge}>Oculta</div>}
-                  <div className={s.albumOverlay}>
-                    <div className={s.albumOverlayActions}>
-                      <button
-                        className={`${s.btnAlbumHide} ${photo.hidden ? s.btnAlbumHideActive : ''}`}
-                        onClick={() => hidePhoto(photo.id)}
-                        title={photo.hidden ? 'Mostrar en proyección' : 'Ocultar de proyección'}
-                      >
-                        {photo.hidden ? '👁 Mostrar' : '🚫 Ocultar'}
-                      </button>
-                      <button className={s.btnAlbumDelete} onClick={() => deletePhoto(photo.id)} title="Eliminar definitivamente">
-                        🗑
-                      </button>
-                    </div>
+            <>
+              {/* Photos */}
+              {albumPhotos.length > 0 && (
+                <>
+                  {albumVideos.length > 0 && (
+                    <div className={s.albumSectionLabel}>📸 Fotos · {albumPhotos.length}</div>
+                  )}
+                  <div className={s.albumGrid}>
+                    {albumPhotos.map((photo) => (
+                      <div key={photo.id} className={`${s.albumCard} ${photo.hidden ? s.albumCardHidden : ''}`}>
+                        <img src={photo.url} loading="lazy" alt="" />
+                        {photo.hidden && <div className={s.hiddenBadge}>Oculta</div>}
+                        <div className={s.albumOverlay}>
+                          <div className={s.albumOverlayActions}>
+                            <button
+                              className={`${s.btnAlbumHide} ${photo.hidden ? s.btnAlbumHideActive : ''}`}
+                              onClick={() => hidePhoto(photo.id)}
+                            >
+                              {photo.hidden ? '👁 Mostrar' : '🚫 Ocultar'}
+                            </button>
+                            <button className={s.btnAlbumDelete} onClick={() => deletePhoto(photo.id)}>🗑</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
+                </>
+              )}
+
+              {/* Videos */}
+              {albumVideos.length > 0 && (
+                <>
+                  <div className={s.albumSectionLabel}>🎬 Videos · {albumVideos.length}</div>
+                  <div className={s.albumGrid}>
+                    {albumVideos.map((video) => (
+                      <div
+                        key={video.id}
+                        className={`${s.albumCard} ${video.status === 'ready' ? s.videoAlbumCard : ''} ${video.hidden ? s.albumCardHidden : ''}`}
+                        onClick={() => video.status === 'ready' && setVideoModal({ video })}
+                      >
+                        {video.thumbnail_url
+                          ? <img src={video.thumbnail_url} loading="lazy" alt="" />
+                          : <div className={s.videoThumbPlaceholder}>🎬</div>
+                        }
+                        {video.status === 'processing' && <div className={s.videoProcBadge}>Procesando...</div>}
+                        {video.status === 'ready' && <div className={s.videoPlayIcon}>▶</div>}
+                        {video.hidden && <div className={s.hiddenBadge}>Oculto</div>}
+                        <div className={s.albumOverlay}>
+                          <div className={s.albumOverlayActions}>
+                            <button
+                              className={`${s.btnAlbumHide} ${video.hidden ? s.btnAlbumHideActive : ''}`}
+                              onClick={(e) => { e.stopPropagation(); hideVideo(video.id) }}
+                            >
+                              {video.hidden ? '👁 Mostrar' : '🚫 Ocultar'}
+                            </button>
+                            <button
+                              className={s.btnAlbumDelete}
+                              onClick={(e) => { e.stopPropagation(); deleteVideo(video.id) }}
+                            >
+                              🗑
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
           )}
+        </div>
+      )}
+
+      {/* ── Video preview modal ── */}
+      {videoModal && (
+        <div className={s.videoModal} onClick={() => setVideoModal(null)}>
+          <div className={s.videoModalInner} onClick={(e) => e.stopPropagation()}>
+            <video
+              key={videoModal.video.id}
+              src={videoModal.video.url}
+              controls
+              autoPlay
+              playsInline
+              className={s.videoModalPlayer}
+            />
+            <div className={s.videoModalActions}>
+              <button className={s.btnProjectVideo} onClick={() => projectVideo(videoModal.video)}>
+                📽 Proyectar en display
+              </button>
+              <button className={s.btnVideoDelete} onClick={() => deleteVideo(videoModal.video.id)}>
+                🗑 Eliminar
+              </button>
+              <button className={s.btnModalClose} onClick={() => setVideoModal(null)}>✕</button>
+            </div>
+          </div>
         </div>
       )}
 

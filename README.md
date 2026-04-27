@@ -11,8 +11,28 @@ Sistema de fotobooth SaaS para eventos. Los invitados escanean un QR, sacan foto
 | Backend | Node.js + Express + Socket.io |
 | Base de datos | MySQL 8 + Sequelize ORM |
 | Frontend | React 18 + Vite |
+| Video | FFmpeg (requerido en el servidor) |
 | Proceso | PM2 |
 | Deploy | VPS Ubuntu 22.04 |
+
+---
+
+## Requisito: FFmpeg
+
+El procesamiento de videos (transcodificación, miniaturas) requiere **FFmpeg** instalado en el servidor.
+
+```bash
+# Ubuntu / Debian
+sudo apt update && sudo apt install -y ffmpeg
+
+# macOS (Homebrew)
+brew install ffmpeg
+
+# Verificar instalación
+ffmpeg -version
+```
+
+> Sin FFmpeg, el servidor arrancará igual pero los videos subidos quedarán en estado `processing` indefinidamente.
 
 ---
 
@@ -28,7 +48,8 @@ partywall/
 ├── models/
 │   ├── index.js             # Conexión Sequelize + asociaciones
 │   ├── Event.js             # Modelo de evento
-│   └── Photo.js             # Modelo de foto
+│   ├── Photo.js             # Modelo de foto
+│   └── Video.js             # Modelo de video
 ├── client/                  # Frontend React (Vite)
 │   └── src/
 │       ├── pages/
@@ -43,7 +64,11 @@ partywall/
 ├── public/                  # Build del frontend (generado)
 ├── storage/                 # Archivos por evento (no se commitea)
 │   └── {eventId}/
-│       └── uploads/         # Fotos subidas por invitados
+│       ├── uploads/         # Fotos subidas por invitados
+│       └── videos/
+│           ├── raw/         # Videos originales (temporal)
+│           ├── processed/   # Videos transcodificados (H.264)
+│           └── thumbs/      # Miniaturas de video
 ├── scripts/
 │   └── backup.sh            # Script de backup MySQL
 ├── backups/                 # Backups diarios (no se commitea)

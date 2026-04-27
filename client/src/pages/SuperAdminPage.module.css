@@ -129,6 +129,7 @@
 .pillOn    { background: rgba(0,232,144,0.15); color: var(--gold); }
 .pillOff   { background: rgba(255,255,255,0.06); color: var(--muted); }
 .pillMusic { background: rgba(77,255,192,0.12); color: #4dffc0; }
+.pillVideo { background: rgba(160,100,255,0.15); color: #b87fff; }
 .pill:hover { opacity: 0.75; }
 
 .cellActions { display: flex; gap: 6px; align-items: center; }

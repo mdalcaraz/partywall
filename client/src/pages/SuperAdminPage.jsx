@@ -118,6 +118,15 @@ export default function SuperAdminPage() {
     load()
   }
 
+  const toggleVideo = async (ev) => {
+    await authFetch(`${BASE}api/events/${ev.id}/video`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !ev.video_enabled }),
+    })
+    showToast(ev.video_enabled ? 'Video desactivado' : 'Video activado')
+    load()
+  }
+
   const deleteEvent = async (ev) => {
     if (!confirm(`¿Eliminar el evento "${ev.name}" y todas sus fotos?`)) return
     await authFetch(`${BASE}api/events/${ev.id}`, { method: 'DELETE' })
@@ -161,6 +170,7 @@ export default function SuperAdminPage() {
                 <span>Fotos</span>
                 <span>Estado</span>
                 <span>Música</span>
+                <span>Video</span>
                 <span>Acciones</span>
               </div>
               {events.map((ev) => (
@@ -184,6 +194,15 @@ export default function SuperAdminPage() {
                       title={ev.music_enabled ? 'Desactivar música' : 'Activar música'}
                     >
                       {ev.music_enabled ? '🎵 On' : '🎵 Off'}
+                    </button>
+                  </span>
+                  <span>
+                    <button
+                      className={`${s.pill} ${ev.video_enabled ? s.pillVideo : s.pillOff}`}
+                      onClick={() => toggleVideo(ev)}
+                      title={ev.video_enabled ? 'Desactivar video' : 'Activar video'}
+                    >
+                      {ev.video_enabled ? '🎬 On' : '🎬 Off'}
                     </button>
                   </span>
                   <span className={s.cellActions}>

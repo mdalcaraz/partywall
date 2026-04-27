@@ -29,6 +29,10 @@ module.exports = (sequelize, DataTypes) => {
       type:         DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    video_enabled: {
+      type:         DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
     location: {
       type:      DataTypes.STRING(255),
       allowNull: true,

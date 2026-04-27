@@ -13,10 +13,29 @@
   flex-shrink: 0;
   width: 100%;
   max-width: 480px;
-  padding: 12px 20px;
+  padding: 10px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
+}
+
+/* ── Media type tabs ── */
+.mediaTabs {
+  display: flex; gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px;
+}
+.mediaTab {
+  height: 28px; padding: 0 12px;
+  border-radius: 999px; border: none;
+  background: transparent; color: var(--muted);
+  font-size: .72rem; font-family: var(--font-body);
+  cursor: pointer; transition: all .2s; white-space: nowrap;
+}
+.mediaTabActive {
+  background: var(--gold); color: #080808; font-weight: 700;
 }
 .logo {
   height: 36px;
@@ -240,6 +259,70 @@
   cursor: pointer; text-decoration: underline; opacity: .8;
 }
 .termsLink:hover { opacity: 1; }
+
+/* ── Video preview (recorded/picked) ── */
+.vidPreview {
+  width: 100%; height: 100%;
+  object-fit: contain; display: block;
+  background: #000; border-radius: var(--radius);
+}
+
+/* ── Recording indicator ── */
+.recBadge {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(0,0,0,.72); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,50,50,.4);
+  border-radius: 999px; padding: 4px 12px 4px 8px;
+  font-size: .78rem; color: rgba(255,255,255,.9);
+  font-family: var(--font-body); font-variant-numeric: tabular-nums;
+  z-index: 5;
+  overflow: hidden;
+}
+.recDot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #ff3333;
+  animation: rec-pulse 1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes rec-pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+.recBar {
+  position: absolute; bottom: 0; left: 0; height: 2px;
+  background: #ff3333; transition: width 1s linear;
+}
+
+/* ── Record button ── */
+.recordBtn {
+  width: 72px; height: 72px; border-radius: 50%;
+  border: 4px solid rgba(255,255,255,.3);
+  background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .15s;
+}
+.recordBtn:active { transform: scale(.93); }
+.recordBtn:disabled { opacity: .4; cursor: default; }
+.recordDot {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: #ff3333;
+  box-shadow: 0 0 16px rgba(255,50,50,.5);
+}
+
+/* ── Stop button ── */
+.stopBtn {
+  width: 72px; height: 72px; border-radius: 50%;
+  border: 4px solid rgba(255,50,50,.5);
+  background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .15s;
+  animation: stop-pulse 1.2s ease-in-out infinite;
+}
+@keyframes stop-pulse { 0%,100% { border-color: rgba(255,50,50,.5); } 50% { border-color: rgba(255,50,50,.9); } }
+.stopBtn:active { transform: scale(.93); }
+.stopSquare {
+  width: 26px; height: 26px; border-radius: 5px;
+  background: #ff3333;
+}
 
 /* ── Landscape ── */
 @media (orientation: landscape) {

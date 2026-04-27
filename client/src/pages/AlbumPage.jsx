@@ -18,19 +18,26 @@ export default function AlbumPage() {
   const { eventId } = useParams()
   const [info, setInfo]           = useState(null)
   const [photos, setPhotos]       = useState([])
+  const [videos, setVideos]       = useState([])
   const [loading, setLoading]     = useState(true)
   const [showTerms, setShowTerms] = useState(false)
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected]   = useState(new Set())
+  const [lightbox, setLightbox]   = useState(null)  // { type: 'photo'|'video', item }
   const socketRef = useRef(null)
 
   useEffect(() => {
     Promise.all([
       fetch(`${BASE}api/e/${eventId}/album/info`).then(r => r.json()),
       fetch(`${BASE}api/e/${eventId}/album`).then(r => r.json()),
-    ]).then(([inf, ph]) => {
+    ]).then(([inf, data]) => {
       setInfo(inf)
-      setPhotos(Array.isArray(ph) ? ph : [])
+      if (Array.isArray(data)) {
+        setPhotos(data)
+      } else {
+        setPhotos(data.photos || [])
+        setVideos(data.videos || [])
+      }
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [eventId])
@@ -38,13 +45,22 @@ export default function AlbumPage() {
   useEffect(() => {
     const socket = getSocket(eventId)
     socketRef.current = socket
-    const onNueva     = (photo) => setPhotos(prev => [photo, ...prev])
-    const onEliminada = ({ id }) => setPhotos(prev => prev.filter(p => p.id !== id))
-    socket.on('nueva_foto',    onNueva)
-    socket.on('foto_eliminada', onEliminada)
+    const onNueva        = (photo) => setPhotos(prev => [photo, ...prev])
+    const onEliminada    = ({ id }) => setPhotos(prev => prev.filter(p => p.id !== id))
+    const onVideoNueva   = (video) => setVideos(prev => [video, ...prev])
+    const onVideoLista   = (video) => setVideos(prev => prev.map(v => v.id === video.id ? video : v))
+    const onVideoElim    = ({ id }) => setVideos(prev => prev.filter(v => v.id !== id))
+    socket.on('nueva_foto',      onNueva)
+    socket.on('foto_eliminada',  onEliminada)
+    socket.on('video_nueva',     onVideoNueva)
+    socket.on('video_lista',     onVideoLista)
+    socket.on('video_eliminada', onVideoElim)
     return () => {
-      socket.off('nueva_foto',    onNueva)
-      socket.off('foto_eliminada', onEliminada)
+      socket.off('nueva_foto',      onNueva)
+      socket.off('foto_eliminada',  onEliminada)
+      socket.off('video_nueva',     onVideoNueva)
+      socket.off('video_lista',     onVideoLista)
+      socket.off('video_eliminada', onVideoElim)
     }
   }, [eventId])
 
@@ -79,9 +95,10 @@ export default function AlbumPage() {
   const logo = info?.brand_logo_url || `${BASE}logo.png`
   const ig   = info?.brand_instagram
 
-  const dateStr = info?.date
+  const dateStr   = info?.date
     ? new Date(info.date).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
     : null
+  const totalItems = photos.length + videos.length
 
   return (
     <div className={s.page}>
@@ -90,7 +107,7 @@ export default function AlbumPage() {
         <div className={s.headerRow}>
           <img src={logo} alt="logo" className={s.logo} />
           <div className={s.headerActions}>
-            {photos.length > 0 && !selecting && (
+            {totalItems > 0 && !selecting && (
               <>
                 <button className={s.btnSelect} onClick={() => setSelecting(true)}>
                   Seleccionar
@@ -118,56 +135,78 @@ export default function AlbumPage() {
       </div>
 
       {/* ── Grid ── */}
-      {photos.length === 0 ? (
+      {totalItems === 0 ? (
         <div className={s.empty}>
           <div className={s.emptyIcon}>📭</div>
-          <p>Todavía no hay fotos en este álbum.</p>
+          <p>Todavía no hay contenido en este álbum.</p>
         </div>
       ) : (
         <div className={s.grid}>
+          {/* Photos */}
           {photos.map(photo => {
             const isSelected = selected.has(photo.id)
             return (
               <div
                 key={photo.id}
                 className={`${s.photoCard} ${selecting ? s.photoCardSelecting : ''} ${isSelected ? s.photoCardSelected : ''}`}
-                onClick={selecting ? () => toggleSelect(photo.id) : undefined}
+                onClick={selecting ? () => toggleSelect(photo.id) : () => setLightbox({ type: 'photo', item: photo })}
               >
                 <img src={photo.url} alt="" loading="lazy" className={s.photoImg} />
-
                 {selecting ? (
                   <div className={s.checkWrap}>
-                    <div className={`${s.checkCircle} ${isSelected ? s.checkCircleActive : ''}`}>
-                      {isSelected && '✓'}
-                    </div>
+                    <div className={`${s.checkCircle} ${isSelected ? s.checkCircleActive : ''}`}>{isSelected && '✓'}</div>
                   </div>
                 ) : (
                   <div className={s.photoOverlay}>
-                    <a
-                      href={photo.url}
-                      download={photo.filename}
-                      className={s.btnDownload}
-                      onClick={e => e.stopPropagation()}
-                    >
-                      ↓
-                    </a>
+                    <a href={photo.url} download={photo.filename} className={s.btnDownload} onClick={e => e.stopPropagation()}>↓</a>
                   </div>
                 )}
               </div>
             )
           })}
+
+          {/* Videos */}
+          {videos.map(video => (
+            <div
+              key={video.id}
+              className={`${s.photoCard} ${s.videoCard}`}
+              onClick={() => !selecting && video.status === 'ready' && setLightbox({ type: 'video', item: video })}
+            >
+              {video.thumbnail_url
+                ? <img src={video.thumbnail_url} alt="" loading="lazy" className={s.photoImg} />
+                : <div className={s.videoThumbPlaceholder}>🎬</div>}
+              <div className={s.videoPlayBadge}>
+                {video.status === 'processing' ? <span className={s.processingBadge}>Procesando...</span> : '▶'}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* ── Video próximamente ── */}
-      <div className={s.comingSoon}>
-        <div className={s.comingSoonIcon}>🎬</div>
-        <div className={s.comingSoonText}>
-          <span className={s.comingSoonTitle}>Video · Próximamente</span>
-          <span className={s.comingSoonSub}>Subí y compartí momentos en video desde la app</span>
+      {/* ── Lightbox ── */}
+      {lightbox && (
+        <div className={s.lightbox} onClick={() => setLightbox(null)}>
+          <div className={s.lightboxInner} onClick={e => e.stopPropagation()}>
+            {lightbox.type === 'photo' ? (
+              <>
+                <img src={lightbox.item.url} alt="" className={s.lightboxImg} />
+                <div className={s.lightboxActions}>
+                  <a href={lightbox.item.url} download={lightbox.item.filename} className={s.lightboxBtn}>↓ Descargar</a>
+                  <button className={s.lightboxClose} onClick={() => setLightbox(null)}>✕</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <video src={lightbox.item.url} controls autoPlay playsInline className={s.lightboxVideo} />
+                <div className={s.lightboxActions}>
+                  <a href={lightbox.item.url} download={lightbox.item.filename || 'video.mp4'} className={s.lightboxBtn}>↓ Descargar</a>
+                  <button className={s.lightboxClose} onClick={() => setLightbox(null)}>✕</button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
-        <span className={s.comingSoonBadge}>Premium</span>
-      </div>
+      )}
 
       {/* ── Footer ── */}
       <footer className={s.footer}>
