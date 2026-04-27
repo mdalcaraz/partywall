@@ -14,7 +14,8 @@ cd "$APP_DIR"
 
 # ── 1. Pull latest ─────────────────────────────────────────────────────────
 echo "▶ Bajando cambios..."
-git pull origin main
+git fetch origin main
+git reset --hard origin/main
 
 # ── 2. Backend deps ────────────────────────────────────────────────────────
 echo "▶ Instalando dependencias del servidor..."
