@@ -15,7 +15,6 @@ module.exports = (sequelize, DataTypes) => {
     op_user: {
       type:      DataTypes.STRING,
       allowNull: false,
-      unique:    true,
     },
     op_pass: {
       type:      DataTypes.STRING,
