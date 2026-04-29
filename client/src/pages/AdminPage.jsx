@@ -25,6 +25,7 @@ export default function AdminPage() {
   const [albumPhotos, setAlbumPhotos] = useState([])
   const [albumVideos, setAlbumVideos] = useState([])
   const [videoModal, setVideoModal]   = useState(null) // null | { video }
+  const [photoModal, setPhotoModal]   = useState(null) // null | { photo }
   const [showQrs, setShowQrs]       = useState(false)
   const toastTimer = useRef(null)
   const socketRef  = useRef(null)
@@ -260,18 +261,18 @@ export default function AdminPage() {
                   )}
                   <div className={s.albumGrid}>
                     {albumPhotos.map((photo) => (
-                      <div key={photo.id} className={`${s.albumCard} ${photo.hidden ? s.albumCardHidden : ''}`}>
+                      <div key={photo.id} className={`${s.albumCard} ${photo.hidden ? s.albumCardHidden : ''}`} onClick={() => setPhotoModal({ photo })}>
                         <img src={photo.url} loading="lazy" alt="" />
                         {photo.hidden && <div className={s.hiddenBadge}>Oculta</div>}
                         <div className={s.albumOverlay}>
                           <div className={s.albumOverlayActions}>
                             <button
                               className={`${s.btnAlbumHide} ${photo.hidden ? s.btnAlbumHideActive : ''}`}
-                              onClick={() => hidePhoto(photo.id)}
+                              onClick={(e) => { e.stopPropagation(); hidePhoto(photo.id) }}
                             >
                               {photo.hidden ? '👁 Mostrar' : '🚫 Ocultar'}
                             </button>
-                            <button className={s.btnAlbumDelete} onClick={() => deletePhoto(photo.id)}>🗑</button>
+                            <button className={s.btnAlbumDelete} onClick={(e) => { e.stopPropagation(); deletePhoto(photo.id) }}>🗑</button>
                           </div>
                         </div>
                       </div>
@@ -322,6 +323,30 @@ export default function AdminPage() {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* ── Photo preview modal ── */}
+      {photoModal && (
+        <div className={s.videoModal} onClick={() => setPhotoModal(null)}>
+          <div className={s.videoModalInner} onClick={(e) => e.stopPropagation()}>
+            <img src={photoModal.photo.url} className={s.photoModalImg} alt="" />
+            <div className={s.videoModalActions}>
+              <button className={s.btnProjectVideo} onClick={() => { project(photoModal.photo); setPhotoModal(null) }}>
+                📽 Proyectar en display
+              </button>
+              <button
+                className={s.btnAlbumHide}
+                onClick={() => { hidePhoto(photoModal.photo.id); setPhotoModal(p => ({ photo: { ...p.photo, hidden: !p.photo.hidden } })) }}
+              >
+                {photoModal.photo.hidden ? '👁 Mostrar' : '🚫 Ocultar'}
+              </button>
+              <button className={s.btnVideoDelete} onClick={() => { deletePhoto(photoModal.photo.id); setPhotoModal(null) }}>
+                🗑 Eliminar
+              </button>
+              <button className={s.btnModalClose} onClick={() => setPhotoModal(null)}>✕</button>
+            </div>
+          </div>
         </div>
       )}
 
