@@ -69,6 +69,13 @@ export default function DisplayPage() {
   const notifTimer  = useRef(null)
   const ssTimer     = useRef(null)
   const socketRef   = useRef(null)
+  const videoRef    = useRef(null)
+
+  useEffect(() => {
+    if (!videoRef.current || !currentVideo) return
+    videoRef.current.muted = true
+    videoRef.current.play().catch(() => {})
+  }, [currentVideo?.id])
 
   const playingTrack = musicRequests.find(r => r.status === 'playing') || null
 
@@ -179,10 +186,9 @@ export default function DisplayPage() {
       {currentVideo && (
         <div className={s.videoStage}>
           <video
+            ref={videoRef}
             key={currentVideo.id}
             src={currentVideo.url}
-            autoPlay
-            muted
             playsInline
             onEnded={() => socketRef.current?.emit('video_slideshow_ended', { eventId })}
             className={s.videoPlayer}

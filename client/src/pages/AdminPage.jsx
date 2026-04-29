@@ -27,8 +27,15 @@ export default function AdminPage() {
   const [albumVideos, setAlbumVideos] = useState([])
   const [mediaModal, setMediaModal]   = useState(null) // null | item con _type
   const [showQrs, setShowQrs]       = useState(false)
-  const toastTimer = useRef(null)
-  const socketRef  = useRef(null)
+  const toastTimer    = useRef(null)
+  const socketRef     = useRef(null)
+  const currentVidRef = useRef(null)
+
+  useEffect(() => {
+    if (!currentVidRef.current || !currentVideoProj) return
+    currentVidRef.current.muted = true
+    currentVidRef.current.play().catch(() => {})
+  }, [currentVideoProj?.id])
 
   // Music state
   const [musicEnabled, setMusicEnabled]   = useState(false)
@@ -397,11 +404,14 @@ export default function AdminPage() {
             <div className={s.currentBlock}>
               {currentVideoProj ? (
                 <>
-                  {currentVideoProj.thumbnail_url
-                    ? <img src={currentVideoProj.thumbnail_url} alt="actual" />
-                    : <div className={s.videoThumbPlaceholder}>🎬</div>
-                  }
-                  <div className={s.videoPlayIcon}>▶</div>
+                  <video
+                    ref={currentVidRef}
+                    key={currentVideoProj.id}
+                    src={currentVideoProj.url}
+                    playsInline
+                    loop
+                    className={s.currentVideoPreview}
+                  />
                   <div className={s.currentBadge}>EN VIVO</div>
                 </>
               ) : currentPhoto ? (
