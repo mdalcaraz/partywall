@@ -240,6 +240,15 @@ export default function AdminPage() {
         </div>
         <div className={s.spacer} />
         <a
+          href={`${BASE}e/${eventId}`}
+          target="_blank"
+          rel="noreferrer"
+          className={s.btnAlbumLink}
+          title="Hub de invitados"
+        >
+          🔗 Hub ↗
+        </a>
+        <a
           href={`${BASE}e/${eventId}/album`}
           target="_blank"
           rel="noreferrer"

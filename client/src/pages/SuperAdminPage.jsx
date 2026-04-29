@@ -134,6 +134,7 @@ export default function SuperAdminPage() {
     load()
   }
 
+  const hubUrl     = (id) => `${window.location.origin}${BASE}e/${id}`
   const guestUrl   = (id) => `${window.location.origin}${BASE}e/${id}/guest`
   const displayUrl = (id) => `${window.location.origin}${BASE}e/${id}/display`
   const musicUrl   = (id) => `${window.location.origin}${BASE}e/${id}/music`
@@ -208,7 +209,7 @@ export default function SuperAdminPage() {
                   <span className={s.cellActions}>
                     <button className={s.btnIcon} title="Editar" onClick={() => openEdit(ev)}>✏️</button>
                     <a className={s.btnIcon} href={`${BASE}admin/${ev.id}`} target="_blank" rel="noreferrer" title="Panel admin">🎛️</a>
-                    <a className={s.btnIcon} href={guestUrl(ev.id)} target="_blank" rel="noreferrer" title="Fotos">📷</a>
+                    <a className={`${s.btnIcon} ${s.btnHub}`} href={hubUrl(ev.id)} target="_blank" rel="noreferrer" title="Hub de invitados">🔗</a>
                     <a className={s.btnIcon} href={displayUrl(ev.id)} target="_blank" rel="noreferrer" title="Display">📽️</a>
                     {ev.music_enabled && <a className={s.btnIcon} href={musicUrl(ev.id)} target="_blank" rel="noreferrer" title="Música">🎵</a>}
                     <button className={`${s.btnIcon} ${s.btnDel}`} title="Eliminar" onClick={() => deleteEvent(ev)}>🗑</button>

@@ -146,6 +146,7 @@
   line-height: 1;
 }
 .btnIcon:hover { background: rgba(255,255,255,0.08); }
+.btnHub:hover  { background: rgba(0,232,144,0.1); }
 .btnDel:hover  { background: rgba(220,60,60,0.15); }
 
 /* ── Back button ── */
