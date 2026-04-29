@@ -80,30 +80,56 @@ const slideshowTimers = new Map();
 
 function getSsState(eventId) {
   if (!slideshowTimers.has(eventId))
-    slideshowTimers.set(eventId, { timer: null, interval: 5000, active: false });
+    slideshowTimers.set(eventId, { timer: null, interval: 5000, active: false, idx: -1, waitingForVideo: false });
   return slideshowTimers.get(eventId);
+}
+
+async function showNextItem(eventId) {
+  const ss = getSsState(eventId);
+  if (!ss.active) return;
+  if (ss.timer) { clearTimeout(ss.timer); ss.timer = null; }
+
+  const [photos, videos] = await Promise.all([
+    Photo.findAll({ where: { event_id: eventId, in_slideshow: true, hidden: false, deleted_at: null }, order: [['timestamp', 'ASC']] }),
+    Video.findAll({ where: { event_id: eventId, in_slideshow: true, hidden: false, deleted_at: null, status: 'ready' }, order: [['timestamp', 'ASC']] }),
+  ]);
+
+  const items = [
+    ...photos.map(p => ({ type: 'photo', data: normalize(p), ts: new Date(p.timestamp).getTime() })),
+    ...videos.map(v => ({ type: 'video', data: normalizeVideo(v), ts: new Date(v.timestamp).getTime() })),
+  ].sort((a, b) => a.ts - b.ts);
+
+  if (!items.length) return;
+
+  ss.idx = (ss.idx + 1) % items.length;
+  const item = items[ss.idx];
+
+  if (item.type === 'photo') {
+    ss.waitingForVideo = false;
+    io.to(`event:${eventId}`).emit('mostrar_foto', item.data);
+    io.to(`event:${eventId}`).emit('mostrar_video', null);
+    ss.timer = setTimeout(() => showNextItem(eventId), ss.interval);
+  } else {
+    ss.waitingForVideo = true;
+    io.to(`event:${eventId}`).emit('mostrar_video', item.data);
+    io.to(`event:${eventId}`).emit('mostrar_foto', null);
+    // no timer — avanza cuando DisplayPage emite video_slideshow_ended
+  }
 }
 
 function startSlideshow(eventId) {
   stopSlideshow(eventId);
   const ss = getSsState(eventId);
-  let idx = -1;
   ss.active = true;
-  ss.timer = setInterval(async () => {
-    const photos = await Photo.findAll({
-      where:   { event_id: eventId, in_slideshow: true, hidden: false, deleted_at: null },
-      order:   [['timestamp', 'ASC']],
-    });
-    if (!photos.length) return;
-    idx = (idx + 1) % photos.length;
-    io.to(`event:${eventId}`).emit('mostrar_foto', normalize(photos[idx]));
-  }, ss.interval);
+  ss.idx = -1;
+  showNextItem(eventId);
 }
 
 function stopSlideshow(eventId) {
   const ss = getSsState(eventId);
-  if (ss.timer) { clearInterval(ss.timer); ss.timer = null; }
+  if (ss.timer) { clearTimeout(ss.timer); ss.timer = null; }
   ss.active = false;
+  ss.waitingForVideo = false;
 }
 
 // ── Spotify token cache ───────────────────────────────────────────────────
@@ -917,6 +943,14 @@ io.on('connection', (socket) => {
     ss.interval = interval || 5000;
     startSlideshow(eventId);
     io.to(`event:${eventId}`).emit('slideshow_estado', { active: true, interval: ss.interval });
+  });
+
+  socket.on('video_slideshow_ended', ({ eventId }) => {
+    const ss = getSsState(eventId);
+    if (ss.active && ss.waitingForVideo) {
+      ss.waitingForVideo = false;
+      showNextItem(eventId);
+    }
   });
 
   socket.on('slideshow_stop', ({ eventId }) => {

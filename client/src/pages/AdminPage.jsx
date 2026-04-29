@@ -80,8 +80,9 @@ export default function AdminPage() {
     }
 
     // Video socket events
-    const onVideoNueva = (video) => { setAlbumVideos(prev => [video, ...prev]); showToast('🎬 Nuevo video recibido', 'green') }
-    const onVideoLista = (video) => setAlbumVideos(prev => prev.map(v => v.id === video.id ? video : v))
+    const onVideoNueva      = (video) => { setAlbumVideos(prev => [video, ...prev]); showToast('🎬 Nuevo video recibido', 'green') }
+    const onVideoLista      = (video) => setAlbumVideos(prev => prev.map(v => v.id === video.id ? video : v))
+    const onVideoActualizada = ({ id, inSlideshow }) => setAlbumVideos(prev => prev.map(v => v.id === id ? { ...v, inSlideshow } : v))
     const onVideoElim  = ({ id }) => {
       setAlbumVideos(prev => prev.filter(v => v.id !== id))
       setVideoModal(m => m?.video?.id === id ? null : m)
@@ -112,6 +113,7 @@ export default function AdminPage() {
     socket.on('video_lista',           onVideoLista)
     socket.on('video_eliminada',       onVideoElim)
     socket.on('video_error',           onVideoError)
+    socket.on('video_actualizada',     onVideoActualizada)
     socket.on('music_nueva',           onMusicNueva)
     socket.on('music_actualizada',     onMusicActualizada)
     socket.on('music_eliminada',       onMusicEliminada)
@@ -132,6 +134,7 @@ export default function AdminPage() {
       socket.off('video_lista',           onVideoLista)
       socket.off('video_eliminada',       onVideoElim)
       socket.off('video_error',           onVideoError)
+      socket.off('video_actualizada',     onVideoActualizada)
       socket.off('music_nueva',           onMusicNueva)
       socket.off('music_actualizada',     onMusicActualizada)
       socket.off('music_eliminada',       onMusicEliminada)
@@ -161,12 +164,12 @@ export default function AdminPage() {
   const toggleSlide  = (id) => {
     setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow: !p.inSlideshow } : p))
     authFetch(`${BASE}api/e/${eventId}/photos/${id}/slideshow`, { method: 'PATCH' })
-      .then((r) => {
-        if (!r.ok) {
-          setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow: !p.inSlideshow } : p))
-          showToast('Error al actualizar')
-        }
-      })
+      .then((r) => { if (!r.ok) setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow: !p.inSlideshow } : p)) })
+  }
+  const toggleVideoSlide = (id) => {
+    setAlbumVideos((prev) => prev.map((v) => v.id === id ? { ...v, inSlideshow: !v.inSlideshow } : v))
+    authFetch(`${BASE}api/e/${eventId}/videos/${id}/slideshow`, { method: 'PATCH' })
+      .then((r) => { if (!r.ok) setAlbumVideos((prev) => prev.map((v) => v.id === id ? { ...v, inSlideshow: !v.inSlideshow } : v)) })
   }
   const clearAll = () => {
     Promise.all(photos.map((p) => authFetch(`${BASE}api/e/${eventId}/photos/${p.id}`, { method: 'DELETE' }))).then(() => showToast('Fotos eliminadas'))
@@ -205,7 +208,12 @@ export default function AdminPage() {
   }
 
   const currentPhoto = photos.find((p) => p.id === currentId) ?? null
-  const playlist     = photos.filter((p) => p.inSlideshow)
+  const playlistPhotos = photos.filter((p) => p.inSlideshow)
+  const playlistVideos = albumVideos.filter((v) => v.inSlideshow && v.status === 'ready')
+  const playlist       = [
+    ...playlistPhotos.map(p => ({ ...p, _type: 'photo' })),
+    ...playlistVideos.map(v => ({ ...v, _type: 'video' })),
+  ].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0))
   const totalAlbum   = albumPhotos.length + albumVideos.length
 
   return (
@@ -442,16 +450,19 @@ export default function AdminPage() {
             <div className={s.playlistSection}>
               <div className={s.playlistHeader}>
                 <span className={s.playlistLabel}>Lista de reproducción</span>
-                <span className={s.playlistCount}>{playlist.length} foto{playlist.length !== 1 ? 's' : ''}</span>
+                <span className={s.playlistCount}>{playlist.length} elemento{playlist.length !== 1 ? 's' : ''}</span>
               </div>
               {playlist.length === 0 ? (
-                <div className={s.playlistEmpty}>Vacía · Usá "+ Lista" en cada foto para agregarla</div>
+                <div className={s.playlistEmpty}>Vacía · Usá "+ Lista" en cada foto o video para agregarla</div>
               ) : (
                 <div className={s.playlistStrip}>
-                  {playlist.map((photo) => (
-                    <div key={photo.id} className={`${s.playlistItem} ${photo.id === currentId ? s.playlistItemActive : ''}`}>
-                      <img src={photo.url} alt="" className={s.playlistThumb} />
-                      <button className={s.btnRemoveFromList} onClick={() => toggleSlide(photo.id)} title="Quitar de lista">×</button>
+                  {playlist.map((item) => (
+                    <div key={item.id} className={`${s.playlistItem} ${item.id === currentId ? s.playlistItemActive : ''}`}>
+                      {item._type === 'video'
+                        ? <div className={s.playlistVideoThumb}>{item.thumbnail_url ? <img src={item.thumbnail_url} alt="" className={s.playlistThumb} /> : '🎬'}<span className={s.playlistVideoBadge}>▶</span></div>
+                        : <img src={item.url} alt="" className={s.playlistThumb} />
+                      }
+                      <button className={s.btnRemoveFromList} onClick={() => item._type === 'video' ? toggleVideoSlide(item.id) : toggleSlide(item.id)} title="Quitar de lista">×</button>
                     </div>
                   ))}
                 </div>
@@ -489,6 +500,39 @@ export default function AdminPage() {
               )}
             </div>
           </div>
+
+          {/* ── Panel: Videos ── */}
+          {albumVideos.filter(v => v.status === 'ready').length > 0 && (
+            <div className={s.panelVideos}>
+              <div className={s.panelHeader}>
+                <div className={s.panelTitle}>🎬 Videos</div>
+                <div className={s.photoCount}>{albumVideos.filter(v => v.status === 'ready').length}</div>
+              </div>
+              <div className={s.videoGrid}>
+                {albumVideos.filter(v => v.status === 'ready').map((video) => (
+                  <div key={video.id} className={`${s.videoCard} ${video.inSlideshow ? s.videoCardInList : ''}`}>
+                    {video.thumbnail_url
+                      ? <img src={video.thumbnail_url} loading="lazy" alt="" />
+                      : <div className={s.videoThumbPlaceholder}>🎬</div>
+                    }
+                    <div className={s.videoPlayIcon}>▶</div>
+                    {video.inSlideshow && <div className={s.inListBadge}>✓ Lista</div>}
+                    <div className={s.photoOverlay}>
+                      <div className={s.overlayActions}>
+                        <button className={s.btnProject} onClick={() => projectVideo(video)}>📽 Proyectar</button>
+                        <button
+                          className={`${s.btnAddList} ${video.inSlideshow ? s.btnAddListActive : ''}`}
+                          onClick={(e) => { e.stopPropagation(); toggleVideoSlide(video.id) }}
+                        >
+                          {video.inSlideshow ? '✓' : '+ Lista'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ── Panel: Música ── */}
           {musicEnabled && (

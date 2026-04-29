@@ -66,8 +66,9 @@ export default function DisplayPage() {
   const [qrImg, setQrImg]               = useState(null)
   const [musicQrImg, setMusicQrImg]     = useState(null)
   const [musicRequests, setMusicRequests] = useState([])
-  const notifTimer = useRef(null)
-  const ssTimer    = useRef(null)
+  const notifTimer  = useRef(null)
+  const ssTimer     = useRef(null)
+  const socketRef   = useRef(null)
 
   const playingTrack = musicRequests.find(r => r.status === 'playing') || null
 
@@ -85,6 +86,7 @@ export default function DisplayPage() {
   useEffect(() => {
     if (!eventId) return
     const socket = getSocket(eventId)
+    socketRef.current = socket
 
     const onEstado    = ({ current, musicRequests: mr }) => {
       if (current) { showImage(current.url); setHasPhoto(true) }
@@ -181,6 +183,7 @@ export default function DisplayPage() {
             src={currentVideo.url}
             autoPlay
             playsInline
+            onEnded={() => socketRef.current?.emit('video_slideshow_ended', { eventId })}
             className={s.videoPlayer}
           />
         </div>
