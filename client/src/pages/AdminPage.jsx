@@ -53,9 +53,10 @@ export default function AdminPage() {
 
     const onConnect    = () => setConnected(true)
     const onDisconnect = () => setConnected(false)
-    const onEstado     = ({ current, photos: ph, musicRequests: mr, musicEnabled: me }) => {
+    const onEstado     = ({ current, photos: ph, videos: vids, musicRequests: mr, musicEnabled: me }) => {
       setPhotos(ph || [])
       setCurrentId(current?.id ?? null)
+      if (Array.isArray(vids)) setAlbumVideos(vids)
       if (mr) setMusicRequests(mr)
       if (me !== undefined) setMusicEnabled(!!me)
     }
