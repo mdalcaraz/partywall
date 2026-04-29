@@ -14,8 +14,9 @@ export default function AdminPage() {
   const eventId           = paramId ?? payload?.eventId
 
   // Photos state
-  const [photos, setPhotos]         = useState([])
-  const [currentId, setCurrentId]   = useState(null)
+  const [photos, setPhotos]             = useState([])
+  const [currentId, setCurrentId]       = useState(null)
+  const [currentVideoProj, setCurrentVideoProj] = useState(null)
   const [ssActive, setSsActive]     = useState(false)
   const [ssInterval, setSsInterval] = useState(3)
   const [qr, setQr]                 = useState(null)
@@ -70,7 +71,8 @@ export default function AdminPage() {
       setAlbumPhotos((prev) => prev.filter((p) => p.id !== id))
       setCurrentId((cur) => (cur === id ? null : cur))
     }
-    const onMostrar    = (photo)          => setCurrentId(photo?.id ?? null)
+    const onMostrar      = (photo) => { setCurrentId(photo?.id ?? null); if (photo) setCurrentVideoProj(null) }
+    const onMostrarVideo = (video) => { setCurrentVideoProj(video || null); if (video) setCurrentId(null) }
     const onSlideshow  = ({ active })     => setSsActive(active)
     const onActualizada = ({ id, inSlideshow }) => setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow } : p))
     const onOcultada   = ({ id, hidden }) => {
@@ -105,6 +107,7 @@ export default function AdminPage() {
     socket.on('nueva_foto',            onNueva)
     socket.on('foto_eliminada',        onEliminada)
     socket.on('mostrar_foto',          onMostrar)
+    socket.on('mostrar_video',         onMostrarVideo)
     socket.on('slideshow_estado',      onSlideshow)
     socket.on('foto_actualizada',      onActualizada)
     socket.on('foto_ocultada',         onOcultada)
@@ -126,6 +129,7 @@ export default function AdminPage() {
       socket.off('nueva_foto',            onNueva)
       socket.off('foto_eliminada',        onEliminada)
       socket.off('mostrar_foto',          onMostrar)
+      socket.off('mostrar_video',         onMostrarVideo)
       socket.off('slideshow_estado',      onSlideshow)
       socket.off('foto_actualizada',      onActualizada)
       socket.off('foto_ocultada',         onOcultada)
@@ -158,7 +162,7 @@ export default function AdminPage() {
 
   // ── Photo actions ─────────────────────────────────────────────────────────
   const project      = (photo) => { socketRef.current?.emit('proyectar', { eventId, photo }); showToast('Foto proyectada') }
-  const clearDisplay = () => { socketRef.current?.emit('proyectar', { eventId, photo: null }); setCurrentId(null); showToast('Pantalla apagada') }
+  const clearDisplay = () => { socketRef.current?.emit('proyectar', { eventId, photo: null }); setCurrentId(null); setCurrentVideoProj(null); showToast('Pantalla apagada') }
   const deletePhoto  = (id) => { authFetch(`${BASE}api/e/${eventId}/photos/${id}`, { method: 'DELETE' }) }
   const toggleSlide  = (id) => {
     setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow: !p.inSlideshow } : p))
@@ -391,7 +395,20 @@ export default function AdminPage() {
           <div className={s.sideSection}>
             <div className={s.sectionLabel}>Proyectando ahora</div>
             <div className={s.currentBlock}>
-              {currentPhoto ? (<><img src={currentPhoto.url} alt="actual" /><div className={s.currentBadge}>EN VIVO</div></>) : (<div className={s.noImage}><span>📽️</span><span>Nada proyectado</span></div>)}
+              {currentVideoProj ? (
+                <>
+                  {currentVideoProj.thumbnail_url
+                    ? <img src={currentVideoProj.thumbnail_url} alt="actual" />
+                    : <div className={s.videoThumbPlaceholder}>🎬</div>
+                  }
+                  <div className={s.videoPlayIcon}>▶</div>
+                  <div className={s.currentBadge}>EN VIVO</div>
+                </>
+              ) : currentPhoto ? (
+                <><img src={currentPhoto.url} alt="actual" /><div className={s.currentBadge}>EN VIVO</div></>
+              ) : (
+                <div className={s.noImage}><span>📽️</span><span>Nada proyectado</span></div>
+              )}
             </div>
             <button className={s.btnSs} onClick={clearDisplay}>⬛ Pantalla negra</button>
           </div>
