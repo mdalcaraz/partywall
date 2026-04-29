@@ -62,6 +62,8 @@ export default function DisplayPage() {
   const [ssActive, setSsActive]         = useState(false)
   const [ssInterval, setSsInterval]     = useState(5000)
   const [ssProgress, setSsProgress]     = useState(0)
+  const [videoProgress, setVideoProgress] = useState(0)
+  const [photoShowTime, setPhotoShowTime] = useState(null)
   const [notif, setNotif]               = useState({ msg: '', visible: false })
   const [qrImg, setQrImg]               = useState(null)
   const [musicQrImg, setMusicQrImg]     = useState(null)
@@ -99,8 +101,8 @@ export default function DisplayPage() {
       if (current) { showImage(current.url); setHasPhoto(true) }
       if (mr) setMusicRequests(mr)
     }
-    const onMostrar      = (photo) => { if (!photo) { showImage(null); setHasPhoto(false); return }; setCurrentVideo(null); showImage(photo.url); setHasPhoto(true) }
-    const onMostrarVideo = (video) => { if (!video) { setCurrentVideo(null); return }; showImage(null); setHasPhoto(false); setCurrentVideo(video) }
+    const onMostrar      = (photo) => { if (!photo) { showImage(null); setHasPhoto(false); return }; setCurrentVideo(null); setVideoProgress(0); showImage(photo.url); setHasPhoto(true); setPhotoShowTime(Date.now()) }
+    const onMostrarVideo = (video) => { if (!video) { setCurrentVideo(null); return }; showImage(null); setHasPhoto(false); setVideoProgress(0); setCurrentVideo(video) }
     const onNueva     = () => showNotif('📸 Nueva foto recibida')
     const onSlideshow = ({ active, interval }) => { setSsActive(active); if (active && interval) setSsInterval(interval) }
 
@@ -136,12 +138,12 @@ export default function DisplayPage() {
     clearInterval(ssTimer.current)
     if (!ssActive) { setSsProgress(0); return }
     setSsProgress(0)
-    const start = Date.now()
+    const start = photoShowTime || Date.now()
     ssTimer.current = setInterval(() => {
       setSsProgress(Math.min(((Date.now() - start) / ssInterval) * 100, 100))
     }, 50)
     return () => clearInterval(ssTimer.current)
-  }, [ssActive, ssInterval])
+  }, [ssActive, ssInterval, photoShowTime])
 
   const particles = Array.from({ length: 18 }, (_, i) => ({
     size:  3 + (i * 7) % 6,
@@ -190,7 +192,11 @@ export default function DisplayPage() {
             key={currentVideo.id}
             src={currentVideo.url}
             playsInline
-            onEnded={() => socketRef.current?.emit('video_slideshow_ended', { eventId })}
+            onTimeUpdate={(e) => {
+              const v = e.currentTarget
+              if (v.duration) setVideoProgress((v.currentTime / v.duration) * 100)
+            }}
+            onEnded={() => { setVideoProgress(0); socketRef.current?.emit('video_slideshow_ended', { eventId }) }}
             className={s.videoPlayer}
           />
         </div>
@@ -215,7 +221,15 @@ export default function DisplayPage() {
         </div>
       )}
 
-      {ssActive && <div className={s.ssBar} style={{ width: `${ssProgress}%` }} />}
+      {(ssActive || !!currentVideo) && (
+        <div
+          className={s.ssBar}
+          style={{
+            width: `${currentVideo ? videoProgress : ssProgress}%`,
+            transition: currentVideo ? 'width 250ms linear' : undefined,
+          }}
+        />
+      )}
 
       <MusicOverlay request={playingTrack} />
 
