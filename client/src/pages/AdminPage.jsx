@@ -24,8 +24,7 @@ export default function AdminPage() {
   const [panelMode, setPanelMode]   = useState('proyeccion') // 'proyeccion' | 'album'
   const [albumPhotos, setAlbumPhotos] = useState([])
   const [albumVideos, setAlbumVideos] = useState([])
-  const [videoModal, setVideoModal]   = useState(null) // null | { video }
-  const [photoModal, setPhotoModal]   = useState(null) // null | { photo }
+  const [mediaModal, setMediaModal]   = useState(null) // null | item con _type
   const [showQrs, setShowQrs]       = useState(false)
   const toastTimer = useRef(null)
   const socketRef  = useRef(null)
@@ -85,7 +84,7 @@ export default function AdminPage() {
     const onVideoActualizada = ({ id, inSlideshow }) => setAlbumVideos(prev => prev.map(v => v.id === id ? { ...v, inSlideshow } : v))
     const onVideoElim  = ({ id }) => {
       setAlbumVideos(prev => prev.filter(v => v.id !== id))
-      setVideoModal(m => m?.video?.id === id ? null : m)
+      setMediaModal(m => m?.id === id ? null : m)
     }
     const onVideoError = ({ id }) => {
       setAlbumVideos(prev => prev.map(v => v.id === id ? { ...v, status: 'error' } : v))
@@ -189,8 +188,8 @@ export default function AdminPage() {
   // ── Video actions ─────────────────────────────────────────────────────────
   const projectVideo = (video) => {
     socketRef.current?.emit('proyectar_video', { eventId, video })
-    setVideoModal(null)
-    showToast('🎬 Video proyectado')
+    setMediaModal(null)
+  showToast('🎬 Video proyectado')
   }
   const hideVideo = (id) => {
     setAlbumVideos((prev) => prev.map((v) => v.id === id ? { ...v, hidden: !v.hidden } : v))
@@ -199,7 +198,7 @@ export default function AdminPage() {
   }
   const deleteVideo = (id) => {
     authFetch(`${BASE}api/e/${eventId}/videos/${id}`, { method: 'DELETE' })
-    setVideoModal((m) => (m?.video?.id === id ? null : m))
+    setMediaModal((m) => (m?.id === id ? null : m))
   }
 
   // ── Music actions ─────────────────────────────────────────────────────────
@@ -208,13 +207,12 @@ export default function AdminPage() {
   }
 
   const currentPhoto = photos.find((p) => p.id === currentId) ?? null
-  const playlistPhotos = photos.filter((p) => p.inSlideshow)
-  const playlistVideos = albumVideos.filter((v) => v.inSlideshow && v.status === 'ready')
-  const playlist       = [
-    ...playlistPhotos.map(p => ({ ...p, _type: 'photo' })),
-    ...playlistVideos.map(v => ({ ...v, _type: 'video' })),
-  ].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0))
-  const totalAlbum   = albumPhotos.length + albumVideos.length
+  const allMedia = [
+    ...photos.map(p => ({ ...p, _type: 'photo' })),
+    ...albumVideos.filter(v => v.status === 'ready').map(v => ({ ...v, _type: 'video' })),
+  ].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+  const playlist = allMedia.filter(m => m.inSlideshow)
+  const totalAlbum = albumPhotos.length + albumVideos.length
 
   return (
     <div className={s.page}>
@@ -269,7 +267,7 @@ export default function AdminPage() {
                   )}
                   <div className={s.albumGrid}>
                     {albumPhotos.map((photo) => (
-                      <div key={photo.id} className={`${s.albumCard} ${photo.hidden ? s.albumCardHidden : ''}`} onClick={() => setPhotoModal({ photo })}>
+                      <div key={photo.id} className={`${s.albumCard} ${photo.hidden ? s.albumCardHidden : ''}`} onClick={() => setMediaModal({ ...photo, _type: 'photo' })}>
                         <img src={photo.url} loading="lazy" alt="" />
                         {photo.hidden && <div className={s.hiddenBadge}>Oculta</div>}
                         <div className={s.albumOverlay}>
@@ -298,7 +296,7 @@ export default function AdminPage() {
                       <div
                         key={video.id}
                         className={`${s.albumCard} ${video.status === 'ready' ? s.videoAlbumCard : ''} ${video.hidden ? s.albumCardHidden : ''}`}
-                        onClick={() => video.status === 'ready' && setVideoModal({ video })}
+                        onClick={() => video.status === 'ready' && setMediaModal({ ...video, _type: 'video' })}
                       >
                         {video.thumbnail_url
                           ? <img src={video.thumbnail_url} loading="lazy" alt="" />
@@ -334,50 +332,32 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── Photo preview modal ── */}
-      {photoModal && (
-        <div className={s.videoModal} onClick={() => setPhotoModal(null)}>
+      {/* ── Media preview modal (fotos + videos) ── */}
+      {mediaModal && (
+        <div className={s.videoModal} onClick={() => setMediaModal(null)}>
           <div className={s.videoModalInner} onClick={(e) => e.stopPropagation()}>
-            <img src={photoModal.photo.url} className={s.photoModalImg} alt="" />
+            {mediaModal._type === 'video'
+              ? <video key={mediaModal.id} src={mediaModal.url} controls autoPlay playsInline className={s.videoModalPlayer} />
+              : <img src={mediaModal.url} className={s.photoModalImg} alt="" />
+            }
             <div className={s.videoModalActions}>
-              <button className={s.btnProjectVideo} onClick={() => { project(photoModal.photo); setPhotoModal(null) }}>
-                📽 Proyectar en display
+              <button className={s.btnProjectVideo} onClick={() => { mediaModal._type === 'video' ? projectVideo(mediaModal) : project(mediaModal); setMediaModal(null) }}>
+                📽 Proyectar
               </button>
               <button
-                className={s.btnAlbumHide}
-                onClick={() => { hidePhoto(photoModal.photo.id); setPhotoModal(p => ({ photo: { ...p.photo, hidden: !p.photo.hidden } })) }}
+                className={`${s.btnAlbumHide} ${mediaModal.inSlideshow ? s.btnAddListActive : ''}`}
+                onClick={() => {
+                  mediaModal._type === 'video' ? toggleVideoSlide(mediaModal.id) : toggleSlide(mediaModal.id)
+                  setMediaModal(m => ({ ...m, inSlideshow: !m.inSlideshow }))
+                }}
               >
-                {photoModal.photo.hidden ? '👁 Mostrar' : '🚫 Ocultar'}
+                {mediaModal.inSlideshow ? '✓ En lista' : '+ Lista'}
               </button>
-              <button className={s.btnVideoDelete} onClick={() => { deletePhoto(photoModal.photo.id); setPhotoModal(null) }}>
-                🗑 Eliminar
-              </button>
-              <button className={s.btnModalClose} onClick={() => setPhotoModal(null)}>✕</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Video preview modal ── */}
-      {videoModal && (
-        <div className={s.videoModal} onClick={() => setVideoModal(null)}>
-          <div className={s.videoModalInner} onClick={(e) => e.stopPropagation()}>
-            <video
-              key={videoModal.video.id}
-              src={videoModal.video.url}
-              controls
-              autoPlay
-              playsInline
-              className={s.videoModalPlayer}
-            />
-            <div className={s.videoModalActions}>
-              <button className={s.btnProjectVideo} onClick={() => projectVideo(videoModal.video)}>
-                📽 Proyectar en display
-              </button>
-              <button className={s.btnVideoDelete} onClick={() => deleteVideo(videoModal.video.id)}>
-                🗑 Eliminar
-              </button>
-              <button className={s.btnModalClose} onClick={() => setVideoModal(null)}>✕</button>
+              {mediaModal._type === 'video'
+                ? <button className={s.btnVideoDelete} onClick={() => { deleteVideo(mediaModal.id); setMediaModal(null) }}>🗑 Eliminar</button>
+                : <button className={s.btnVideoDelete} onClick={() => { deletePhoto(mediaModal.id); setMediaModal(null) }}>🗑 Eliminar</button>
+              }
+              <button className={s.btnModalClose} onClick={() => setMediaModal(null)}>✕</button>
             </div>
           </div>
         </div>
@@ -441,9 +421,9 @@ export default function AdminPage() {
           {/* ── Panel: Fotos ── */}
           <div className={`${s.panelPhotos} ${musicEnabled ? '' : s.panelFull}`}>
             <div className={s.panelHeader}>
-              <div className={s.panelTitle}>📸 Fotos</div>
-              <div className={s.photoCount}>{photos.length} foto{photos.length !== 1 ? 's' : ''}</div>
-              <button className={s.btnClearAll} onClick={clearAll}>🗑 Borrar todas</button>
+              <div className={s.panelTitle}>📸 Media</div>
+              <div className={s.photoCount}>{allMedia.length} elemento{allMedia.length !== 1 ? 's' : ''}</div>
+              <button className={s.btnClearAll} onClick={clearAll}>🗑 Borrar fotos</button>
             </div>
 
             {/* ── Playlist strip ── */}
@@ -453,7 +433,7 @@ export default function AdminPage() {
                 <span className={s.playlistCount}>{playlist.length} elemento{playlist.length !== 1 ? 's' : ''}</span>
               </div>
               {playlist.length === 0 ? (
-                <div className={s.playlistEmpty}>Vacía · Usá "+ Lista" en cada foto o video para agregarla</div>
+                <div className={s.playlistEmpty}>Vacía · Usá "+ Lista" en cada elemento para agregarlo</div>
               ) : (
                 <div className={s.playlistStrip}>
                   {playlist.map((item) => (
@@ -469,30 +449,41 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* ── Photo grid ── */}
+            {/* ── Media grid unificada ── */}
             <div className={s.photoGrid}>
-              {photos.length === 0 ? (
+              {allMedia.length === 0 ? (
                 <div className={s.emptyState}>
                   <div className={s.emptyIcon}>📭</div>
-                  <p>Aún no hay fotos. Los invitados escanean el QR para empezar.</p>
+                  <p>Aún no hay fotos ni videos. Los invitados escanean el QR para empezar.</p>
                 </div>
               ) : (
-                photos.map((photo, i) => (
-                  <div key={photo.id} className={`${s.photoCard} ${photo.id === currentId ? s.photoCardActive : ''}`}>
-                    <img src={photo.url} loading="lazy" alt="foto" />
-                    {i === 0 && photo._new && <div className={s.newBadge}>NUEVA</div>}
-                    {photo.id === currentId && <div className={s.activeBadge}>✦ Activa</div>}
-                    {photo.inSlideshow && <div className={s.inListBadge}>✓ Lista</div>}
+                allMedia.map((item, i) => (
+                  <div
+                    key={item.id}
+                    className={`${s.photoCard} ${item._type === 'video' ? s.photoCardVideo : ''} ${item.id === currentId ? s.photoCardActive : ''}`}
+                    onClick={() => setMediaModal(item)}
+                  >
+                    {item._type === 'video'
+                      ? <>{item.thumbnail_url ? <img src={item.thumbnail_url} loading="lazy" alt="" /> : <div className={s.videoThumbPlaceholder}>🎬</div>}<div className={s.videoPlayIcon}>▶</div></>
+                      : <img src={item.url} loading="lazy" alt="foto" />
+                    }
+                    {i === 0 && item._new && <div className={s.newBadge}>NUEVA</div>}
+                    {item.id === currentId && <div className={s.activeBadge}>✦ Activa</div>}
+                    {item.inSlideshow && <div className={s.inListBadge}>✓ Lista</div>}
                     <div className={s.photoOverlay}>
                       <div className={s.overlayActions}>
-                        <button className={s.btnProject} onClick={() => project(photo)}>📽 Proyectar</button>
                         <button
-                          className={`${s.btnAddList} ${photo.inSlideshow ? s.btnAddListActive : ''}`}
-                          onClick={(e) => { e.stopPropagation(); toggleSlide(photo.id) }}
+                          className={s.btnProject}
+                          onClick={(e) => { e.stopPropagation(); item._type === 'video' ? projectVideo(item) : project(item) }}
                         >
-                          {photo.inSlideshow ? '✓' : '+ Lista'}
+                          📽 Proyectar
                         </button>
-                        <button className={s.btnDelete} onClick={() => deletePhoto(photo.id)} title="Eliminar">🗑</button>
+                        <button
+                          className={`${s.btnAddList} ${item.inSlideshow ? s.btnAddListActive : ''}`}
+                          onClick={(e) => { e.stopPropagation(); item._type === 'video' ? toggleVideoSlide(item.id) : toggleSlide(item.id) }}
+                        >
+                          {item.inSlideshow ? '✓ Lista' : '+ Lista'}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -500,39 +491,6 @@ export default function AdminPage() {
               )}
             </div>
           </div>
-
-          {/* ── Panel: Videos ── */}
-          {albumVideos.filter(v => v.status === 'ready').length > 0 && (
-            <div className={s.panelVideos}>
-              <div className={s.panelHeader}>
-                <div className={s.panelTitle}>🎬 Videos</div>
-                <div className={s.photoCount}>{albumVideos.filter(v => v.status === 'ready').length}</div>
-              </div>
-              <div className={s.videoGrid}>
-                {albumVideos.filter(v => v.status === 'ready').map((video) => (
-                  <div key={video.id} className={`${s.videoCard} ${video.inSlideshow ? s.videoCardInList : ''}`}>
-                    {video.thumbnail_url
-                      ? <img src={video.thumbnail_url} loading="lazy" alt="" />
-                      : <div className={s.videoThumbPlaceholder}>🎬</div>
-                    }
-                    <div className={s.videoPlayIcon}>▶</div>
-                    {video.inSlideshow && <div className={s.inListBadge}>✓ Lista</div>}
-                    <div className={s.photoOverlay}>
-                      <div className={s.overlayActions}>
-                        <button className={s.btnProject} onClick={() => projectVideo(video)}>📽 Proyectar</button>
-                        <button
-                          className={`${s.btnAddList} ${video.inSlideshow ? s.btnAddListActive : ''}`}
-                          onClick={(e) => { e.stopPropagation(); toggleVideoSlide(video.id) }}
-                        >
-                          {video.inSlideshow ? '✓' : '+ Lista'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* ── Panel: Música ── */}
           {musicEnabled && (
