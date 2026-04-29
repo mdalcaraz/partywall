@@ -476,11 +476,26 @@ app.get(`${BASE}/api/e/:eventId/guest/info`, async (req, res) => {
   res.json({ active: true, rateLimit });
 });
 
+app.get(`${BASE}/api/e/:eventId/hub`, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
+  res.json({
+    name:            event.name,
+    date:            event.date            || null,
+    location:        event.location        || null,
+    active:          !!event.active,
+    music_enabled:   !!event.music_enabled,
+    brand_name:      event.brand_name      || 'Top DJ Group',
+    brand_logo_url:  event.brand_logo_url  || null,
+    brand_instagram: event.brand_instagram || '@topdjgroup',
+  });
+});
+
 app.get(`${BASE}/api/e/:eventId/qr`, async (req, res) => {
   const event = await Event.findByPk(req.params.eventId);
   if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
   const base = TUNNEL_URL || `http://${LOCAL_IP}:${PORT}`;
-  const url  = `${base}${BASE}/e/${req.params.eventId}/guest`;
+  const url  = `${base}${BASE}/e/${req.params.eventId}`;
   const qr   = await QRCode.toDataURL(url, { width: 300, margin: 2, color: { dark: '#000', light: '#fff' } });
   res.json({ url, qr });
 });

@@ -6,6 +6,7 @@ import GuestPage       from './pages/GuestPage'
 import DisplayPage     from './pages/DisplayPage'
 import MusicPage       from './pages/MusicPage'
 import AlbumPage       from './pages/AlbumPage'
+import GuestHubPage    from './pages/GuestHubPage'
 import ProtectedRoute  from './components/ProtectedRoute'
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
         <ProtectedRoute role="superadmin"><AdminPage /></ProtectedRoute>
       } />
 
+      <Route path="/e/:eventId"          element={<GuestHubPage />} />
       <Route path="/e/:eventId/guest"   element={<GuestPage />} />
       <Route path="/e/:eventId/display" element={<DisplayPage />} />
       <Route path="/e/:eventId/music"   element={<MusicPage />} />
