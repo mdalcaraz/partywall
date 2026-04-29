@@ -79,7 +79,7 @@
   position: absolute;
   inset: 0;
   width: 100%; height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
 }
 
@@ -324,8 +324,13 @@
   background: #ff3333;
 }
 
+/* ── Media tabs en landscape (dentro de controles) ── */
+.mediaTabsLandscape { display: none; }
+
 /* ── Landscape ── */
 @media (orientation: landscape) {
+  .mediaTabsLandscape { display: flex; }
+
   .page {
     flex-direction: row;
     align-items: stretch;

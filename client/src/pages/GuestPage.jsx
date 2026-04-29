@@ -74,13 +74,11 @@ export default function GuestPage() {
   const startCamera = useCallback(async (facing, withAudio = false) => {
     try {
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop())
-      const landscape = window.matchMedia('(orientation: landscape)').matches
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: facing,
-          width:  { ideal: landscape ? 1920 : 1080 },
-          height: { ideal: landscape ? 1080 : 1920 },
-          aspectRatio: { ideal: landscape ? 16/9 : 9/16 },
+          width:  { ideal: 1920 },
+          height: { ideal: 1080 },
         },
         audio: withAudio,
       })
@@ -150,11 +148,24 @@ export default function GuestPage() {
     await torch(true); await wait(220)
     setShowFlash(true); setTimeout(() => setShowFlash(false), 400)
     const video = videoRef.current, canvas = canvasRef.current
-    canvas.width  = video.videoWidth  || 1280
-    canvas.height = video.videoHeight || 960
+    const vw = video.videoWidth  || 1280
+    const vh = video.videoHeight || 960
+    // Si el stream es landscape pero el teléfono está en portrait, rotamos 90°
+    const angle    = screen.orientation?.angle ?? (window.orientation ?? 0)
+    const portrait = angle === 0 || angle === 180 || angle === -180
+    const rotate90 = vw > vh && portrait
+    canvas.width  = rotate90 ? vh : vw
+    canvas.height = rotate90 ? vw : vh
     const ctx = canvas.getContext('2d')
-    if (facingMode === 'user') { ctx.translate(canvas.width, 0); ctx.scale(-1, 1) }
-    ctx.drawImage(video, 0, 0)
+    if (rotate90) {
+      ctx.translate(canvas.width / 2, canvas.height / 2)
+      ctx.rotate(Math.PI / 2)
+      if (facingMode === 'user') ctx.scale(1, -1)
+      ctx.drawImage(video, -vw / 2, -vh / 2)
+    } else {
+      if (facingMode === 'user') { ctx.translate(canvas.width, 0); ctx.scale(-1, 1) }
+      ctx.drawImage(video, 0, 0)
+    }
     setTimeout(() => torch(false), 300)
     canvas.toBlob((blob) => {
       setCapturedBlob(blob); setPreviewUrl(URL.createObjectURL(blob))
@@ -374,6 +385,12 @@ export default function GuestPage() {
       {/* ── Controls: Foto ── */}
       {mediaType === 'photo' && (
         <div className={s.controls}>
+          {videoEnabled && (
+            <div className={`${s.mediaTabs} ${s.mediaTabsLandscape}`}>
+              <button className={`${s.mediaTab} ${s.mediaTabActive}`} onClick={() => switchMediaType('photo')}>📷 Foto</button>
+              <button className={s.mediaTab} onClick={() => switchMediaType('video')}>🎬 Video</button>
+            </div>
+          )}
           <div className={s.shootRow}>
             <button className={`${s.btnIcon} ${timerDelay > 0 ? s.btnIconActive : ''}`} onClick={toggleTimer} title="Temporizador" disabled={isPhotoPreview}>
               {timerDelay === 0 ? '⏱' : `${timerDelay}s`}
@@ -414,6 +431,12 @@ export default function GuestPage() {
       {/* ── Controls: Video ── */}
       {mediaType === 'video' && (
         <div className={s.controls}>
+          {videoEnabled && (
+            <div className={`${s.mediaTabs} ${s.mediaTabsLandscape}`}>
+              <button className={s.mediaTab} onClick={() => switchMediaType('photo')}>📷 Foto</button>
+              <button className={`${s.mediaTab} ${s.mediaTabActive}`} onClick={() => switchMediaType('video')}>🎬 Video</button>
+            </div>
+          )}
           {(vidState === 'idle' || vidState === 'recording') && (
             <div className={s.shootRow}>
               <button className={s.btnIcon} onClick={flipCamera} disabled={vidState === 'recording'}>🔄</button>
