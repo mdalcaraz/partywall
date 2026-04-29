@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getSocket, disconnectSocket } from '../lib/socket'
 import { authFetch, decodeToken, clearToken } from '../lib/api'
@@ -337,7 +337,7 @@ export default function AdminPage() {
         <div className={s.videoModal} onClick={() => setMediaModal(null)}>
           <div className={s.videoModalInner} onClick={(e) => e.stopPropagation()}>
             {mediaModal._type === 'video'
-              ? <video key={mediaModal.id} src={mediaModal.url} controls autoPlay playsInline className={s.videoModalPlayer} />
+              ? <video key={mediaModal.id} src={mediaModal.url} controls autoPlay muted playsInline className={s.videoModalPlayer} />
               : <img src={mediaModal.url} className={s.photoModalImg} alt="" />
             }
             <div className={s.videoModalActions}>
@@ -456,39 +456,54 @@ export default function AdminPage() {
                   <div className={s.emptyIcon}>📭</div>
                   <p>Aún no hay fotos ni videos. Los invitados escanean el QR para empezar.</p>
                 </div>
-              ) : (
-                allMedia.map((item, i) => (
-                  <div
-                    key={item.id}
-                    className={`${s.photoCard} ${item._type === 'video' ? s.photoCardVideo : ''} ${item.id === currentId ? s.photoCardActive : ''}`}
-                    onClick={() => setMediaModal(item)}
-                  >
-                    {item._type === 'video'
-                      ? <>{item.thumbnail_url ? <img src={item.thumbnail_url} loading="lazy" alt="" /> : <div className={s.videoThumbPlaceholder}>🎬</div>}<div className={s.videoPlayIcon}>▶</div></>
-                      : <img src={item.url} loading="lazy" alt="foto" />
-                    }
-                    {i === 0 && item._new && <div className={s.newBadge}>NUEVA</div>}
-                    {item.id === currentId && <div className={s.activeBadge}>✦ Activa</div>}
-                    {item.inSlideshow && <div className={s.inListBadge}>✓ Lista</div>}
-                    <div className={s.photoOverlay}>
-                      <div className={s.overlayActions}>
-                        <button
-                          className={s.btnProject}
-                          onClick={(e) => { e.stopPropagation(); item._type === 'video' ? projectVideo(item) : project(item) }}
-                        >
-                          📽 Proyectar
-                        </button>
-                        <button
-                          className={`${s.btnAddList} ${item.inSlideshow ? s.btnAddListActive : ''}`}
-                          onClick={(e) => { e.stopPropagation(); item._type === 'video' ? toggleVideoSlide(item.id) : toggleSlide(item.id) }}
-                        >
-                          {item.inSlideshow ? '✓ Lista' : '+ Lista'}
-                        </button>
+              ) : (() => {
+                const groupsMap = {}
+                const groupsOrder = []
+                allMedia.forEach(item => {
+                  const d = item.timestamp ? new Date(item.timestamp) : null
+                  const key = d
+                    ? `${d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })} · ${d.getHours()}:00`
+                    : 'Sin fecha'
+                  if (!groupsMap[key]) { groupsMap[key] = []; groupsOrder.push(key) }
+                  groupsMap[key].push(item)
+                })
+                return groupsOrder.map((key) => (
+                  <Fragment key={key}>
+                    <div className={s.mediaGroupLabel}>{key}</div>
+                    {groupsMap[key].map((item) => (
+                      <div
+                        key={item.id}
+                        className={`${s.photoCard} ${item._type === 'video' ? s.photoCardVideo : ''} ${item.id === currentId ? s.photoCardActive : ''}`}
+                        onClick={() => setMediaModal(item)}
+                      >
+                        {item._type === 'video'
+                          ? <>{item.thumbnail_url ? <img src={item.thumbnail_url} loading="lazy" alt="" /> : <div className={s.videoThumbPlaceholder}>🎬</div>}<div className={s.videoPlayIcon}>▶</div></>
+                          : <img src={item.url} loading="lazy" alt="foto" />
+                        }
+                        {item._new && <div className={s.newBadge}>NUEVA</div>}
+                        {item.id === currentId && <div className={s.activeBadge}>✦ Activa</div>}
+                        {item.inSlideshow && <div className={s.inListBadge}>✓ Lista</div>}
+                        <div className={s.photoOverlay}>
+                          <div className={s.overlayActions}>
+                            <button
+                              className={s.btnProject}
+                              onClick={(e) => { e.stopPropagation(); item._type === 'video' ? projectVideo(item) : project(item) }}
+                            >
+                              📽 Proyectar
+                            </button>
+                            <button
+                              className={`${s.btnAddList} ${item.inSlideshow ? s.btnAddListActive : ''}`}
+                              onClick={(e) => { e.stopPropagation(); item._type === 'video' ? toggleVideoSlide(item.id) : toggleSlide(item.id) }}
+                            >
+                              {item.inSlideshow ? '✓ Lista' : '+ Lista'}
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    ))}
+                  </Fragment>
                 ))
-              )}
+              })()}
             </div>
           </div>
 

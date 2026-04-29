@@ -182,6 +182,7 @@ export default function DisplayPage() {
             key={currentVideo.id}
             src={currentVideo.url}
             autoPlay
+            muted
             playsInline
             onEnded={() => socketRef.current?.emit('video_slideshow_ended', { eventId })}
             className={s.videoPlayer}
