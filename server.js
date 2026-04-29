@@ -13,6 +13,7 @@ const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const ffmpeg   = require('fluent-ffmpeg');
 const sharp    = require('sharp');
+try { ffmpeg.setFfmpegPath(process.env.FFMPEG_PATH || require('child_process').execSync('which ffmpeg').toString().trim()) } catch { ffmpeg.setFfmpegPath('/usr/bin/ffmpeg') }
 const { sequelize, Event, Photo, MusicRequest, Video } = require('./models');
 
 // ── Config ────────────────────────────────────────────────────────────────

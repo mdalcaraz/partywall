@@ -84,6 +84,10 @@ export default function AdminPage() {
       setAlbumVideos(prev => prev.filter(v => v.id !== id))
       setVideoModal(m => m?.video?.id === id ? null : m)
     }
+    const onVideoError = ({ id }) => {
+      setAlbumVideos(prev => prev.map(v => v.id === id ? { ...v, status: 'error' } : v))
+      showToast('❌ Error al procesar video', 'red')
+    }
 
     // Music socket events
     const onMusicNueva       = (r)               => { setMusicRequests(prev => [...prev, r]); showToast(`🎵 ${r.artist_name} — ${r.track_name}`, 'green') }
@@ -105,6 +109,7 @@ export default function AdminPage() {
     socket.on('video_nueva',           onVideoNueva)
     socket.on('video_lista',           onVideoLista)
     socket.on('video_eliminada',       onVideoElim)
+    socket.on('video_error',           onVideoError)
     socket.on('music_nueva',           onMusicNueva)
     socket.on('music_actualizada',     onMusicActualizada)
     socket.on('music_eliminada',       onMusicEliminada)
@@ -124,6 +129,7 @@ export default function AdminPage() {
       socket.off('video_nueva',           onVideoNueva)
       socket.off('video_lista',           onVideoLista)
       socket.off('video_eliminada',       onVideoElim)
+      socket.off('video_error',           onVideoError)
       socket.off('music_nueva',           onMusicNueva)
       socket.off('music_actualizada',     onMusicActualizada)
       socket.off('music_eliminada',       onMusicEliminada)
@@ -290,6 +296,7 @@ export default function AdminPage() {
                         }
                         {video.status === 'processing' && <div className={s.videoProcBadge}>Procesando...</div>}
                         {video.status === 'ready' && <div className={s.videoPlayIcon}>▶</div>}
+                        {video.status === 'error' && <div className={s.videoErrBadge}>❌ Error</div>}
                         {video.hidden && <div className={s.hiddenBadge}>Oculto</div>}
                         <div className={s.albumOverlay}>
                           <div className={s.albumOverlayActions}>
