@@ -66,7 +66,6 @@ export default function DisplayPage() {
   const [photoShowTime, setPhotoShowTime] = useState(null)
   const [notif, setNotif]               = useState({ msg: '', visible: false })
   const [qrImg, setQrImg]               = useState(null)
-  const [musicQrImg, setMusicQrImg]     = useState(null)
   const [musicRequests, setMusicRequests] = useState([])
   const notifTimer  = useRef(null)
   const ssTimer     = useRef(null)
@@ -86,10 +85,6 @@ export default function DisplayPage() {
     fetch(`${BASE}api/e/${eventId}/qr`)
       .then((r) => r.json())
       .then((data) => setQrImg(data.qr))
-    fetch(`${BASE}api/e/${eventId}/music/qr/public`)
-      .then((r) => r.json())
-      .then((data) => { if (data.enabled && data.qr) setMusicQrImg(data.qr) })
-      .catch(() => {})
   }, [eventId])
 
   useEffect(() => {
@@ -207,17 +202,14 @@ export default function DisplayPage() {
         <span className={s.igHandle}>@topdjgroup</span>
       </div>
 
-      {musicQrImg && (
-        <div className={s.qrCornerLeft}>
-          <div className={s.qrLabel}>Pedí tu tema</div>
-          <img src={musicQrImg} alt="QR Música" className={s.qrImg} />
-        </div>
-      )}
-
       {qrImg && (
         <div className={s.qrCorner}>
-          <div className={s.qrLabel}>Enviá tu foto</div>
           <img src={qrImg} alt="QR" className={s.qrImg} />
+          <div className={s.qrTagline}>
+            <span className={s.qrTaglineMain}>Subí tu foto</span>
+            <span className={s.qrTaglineSep}>·</span>
+            <span className={s.qrTaglineMain}>Pedí tu canción</span>
+          </div>
         </div>
       )}
 

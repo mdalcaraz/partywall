@@ -392,17 +392,17 @@ export default function AdminPage() {
               <span className={s.qrToggleIcon}>{showQrs ? '▲' : '▼'}</span>
             </button>
             {showQrs && (
-              <div className={s.qrRow}>
-                <div className={s.qrBlock}>
-                  <div className={s.qrLabel}>Fotos</div>
-                  {qr ? (<><img src={qr.qr} alt="QR" /><div className={s.qrUrl}>{qr.url}</div></>) : (<div className={s.qrLoading}>Cargando...</div>)}
-                </div>
-                {musicEnabled && musicQr && (
-                  <div className={s.qrBlock}>
-                    <div className={s.qrLabel}>Música</div>
-                    <img src={musicQr.qr} alt="QR Música" />
-                    <div className={s.qrUrl}>{musicQr.url}</div>
-                  </div>
+              <div className={s.qrBlock}>
+                <div className={s.qrLabel}>Hub de invitados</div>
+                {qr ? (
+                  <>
+                    <img src={qr.qr} alt="QR Hub" />
+                    <div className={s.qrTagline}>Subí tu foto · Pedí tu canción</div>
+                    <div className={s.qrUrl}>{qr.url}</div>
+                    <a className={s.btnQrDownload} href={qr.qr} download="qr-hub.png">⬇ Descargar QR</a>
+                  </>
+                ) : (
+                  <div className={s.qrLoading}>Cargando...</div>
                 )}
               </div>
             )}
