@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { useParams } from 'react-router-dom'
 import { getSocket } from '../lib/socket'
 import TermsModal from '../components/TermsModal'
@@ -100,6 +100,36 @@ export default function AlbumPage() {
     : null
   const totalItems = photos.length + videos.length
 
+  // ── Build sorted, grouped allMedia ──────────────────────────────────────
+  const allMedia = [
+    ...photos.map(p => ({ ...p, _type: 'photo' })),
+    ...videos.map(v => ({ ...v, _type: 'video' })),
+  ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+
+  const DAY_FMT = new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
+  const dayKey  = (ts) => new Date(ts).toLocaleDateString('es-AR')
+  const dayLabel = (ts) => {
+    const d = new Date(ts)
+    const today = new Date(); today.setHours(0,0,0,0)
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
+    d.setHours(0,0,0,0)
+    if (d.getTime() === today.getTime()) return 'Hoy'
+    if (d.getTime() === yesterday.getTime()) return 'Ayer'
+    return DAY_FMT.format(new Date(ts))
+  }
+
+  const groupsMap = {}
+  const groupsOrder = []
+  allMedia.forEach(item => {
+    const key = item.timestamp ? dayKey(item.timestamp) : 'sin-fecha'
+    if (!groupsMap[key]) {
+      groupsMap[key] = { key, label: item.timestamp ? dayLabel(item.timestamp) : 'Sin fecha', items: [] }
+      groupsOrder.push(key)
+    }
+    groupsMap[key].items.push(item)
+  })
+  const groups = groupsOrder.map(k => groupsMap[k])
+
   return (
     <div className={s.page}>
       {/* ── Header ── */}
@@ -142,43 +172,47 @@ export default function AlbumPage() {
         </div>
       ) : (
         <div className={s.grid}>
-          {/* Photos */}
-          {photos.map(photo => {
-            const isSelected = selected.has(photo.id)
-            return (
-              <div
-                key={photo.id}
-                className={`${s.photoCard} ${selecting ? s.photoCardSelecting : ''} ${isSelected ? s.photoCardSelected : ''}`}
-                onClick={selecting ? () => toggleSelect(photo.id) : () => setLightbox({ type: 'photo', item: photo })}
-              >
-                <img src={photo.url} alt="" loading="lazy" className={s.photoImg} />
-                {selecting ? (
-                  <div className={s.checkWrap}>
-                    <div className={`${s.checkCircle} ${isSelected ? s.checkCircleActive : ''}`}>{isSelected && '✓'}</div>
+          {groups.map(({ key, label, items }) => (
+            <Fragment key={key}>
+              <div className={s.groupLabel}>{label}</div>
+              {items.map(item => {
+                if (item._type === 'photo') {
+                  const isSelected = selected.has(item.id)
+                  return (
+                    <div
+                      key={item.id}
+                      className={`${s.photoCard} ${selecting ? s.photoCardSelecting : ''} ${isSelected ? s.photoCardSelected : ''}`}
+                      onClick={selecting ? () => toggleSelect(item.id) : () => setLightbox({ type: 'photo', item })}
+                    >
+                      <img src={item.url} alt="" loading="lazy" className={s.photoImg} />
+                      {selecting ? (
+                        <div className={s.checkWrap}>
+                          <div className={`${s.checkCircle} ${isSelected ? s.checkCircleActive : ''}`}>{isSelected && '✓'}</div>
+                        </div>
+                      ) : (
+                        <div className={s.photoOverlay}>
+                          <a href={item.url} download={item.filename} className={s.btnDownload} onClick={e => e.stopPropagation()}>↓</a>
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+                return (
+                  <div
+                    key={item.id}
+                    className={`${s.photoCard} ${s.videoCard}`}
+                    onClick={() => !selecting && item.status === 'ready' && setLightbox({ type: 'video', item })}
+                  >
+                    {item.thumbnail_url
+                      ? <img src={item.thumbnail_url} alt="" loading="lazy" className={s.photoImg} />
+                      : <div className={s.videoThumbPlaceholder}>🎬</div>}
+                    <div className={s.videoPlayBadge}>
+                      {item.status === 'processing' ? <span className={s.processingBadge}>Procesando...</span> : '▶'}
+                    </div>
                   </div>
-                ) : (
-                  <div className={s.photoOverlay}>
-                    <a href={photo.url} download={photo.filename} className={s.btnDownload} onClick={e => e.stopPropagation()}>↓</a>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-
-          {/* Videos */}
-          {videos.map(video => (
-            <div
-              key={video.id}
-              className={`${s.photoCard} ${s.videoCard}`}
-              onClick={() => !selecting && video.status === 'ready' && setLightbox({ type: 'video', item: video })}
-            >
-              {video.thumbnail_url
-                ? <img src={video.thumbnail_url} alt="" loading="lazy" className={s.photoImg} />
-                : <div className={s.videoThumbPlaceholder}>🎬</div>}
-              <div className={s.videoPlayBadge}>
-                {video.status === 'processing' ? <span className={s.processingBadge}>Procesando...</span> : '▶'}
-              </div>
-            </div>
+                )
+              })}
+            </Fragment>
           ))}
         </div>
       )}

@@ -142,6 +142,16 @@
   }
 }
 
+.groupLabel {
+  grid-column: 1 / -1;
+  font-size: .7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  color: rgba(255,255,255,.3);
+  padding: 4px 2px 2px;
+}
+
 .photoCard {
   position: relative;
   aspect-ratio: 4/3;
