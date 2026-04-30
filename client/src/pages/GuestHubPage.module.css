@@ -2,14 +2,13 @@
   min-height: 100dvh;
   background: var(--bg);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 32px 20px;
+  padding: 32px 20px 24px;
   position: relative;
   overflow: hidden;
 }
 
-/* radial glow behind content */
 .glow {
   position: absolute;
   top: -10%;
@@ -21,14 +20,17 @@
   pointer-events: none;
 }
 
-.content {
+/* ── Main: header + links, ocupa el espacio disponible y centra ── */
+.main {
   position: relative;
+  flex: 1;
   width: 100%;
   max-width: 400px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 36px;
+  justify-content: center;
+  gap: 32px;
 }
 
 /* ── Header ── */
@@ -89,9 +91,7 @@
   transform: translateY(-2px);
 }
 
-.link:active {
-  transform: scale(.98);
-}
+.link:active { transform: scale(.98); }
 
 .linkEmoji {
   font-size: 1.5rem;
@@ -131,48 +131,34 @@
   transform: translateX(2px);
 }
 
-/* ── Footer ── */
+/* ── Footer (siempre al fondo) ── */
 .footer {
-  margin-top: 4px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
-.qrBlock {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-}
-
-.qrImg {
-  width: 140px;
-  height: 140px;
-  border-radius: 8px;
-  display: block;
+  padding-top: 20px;
 }
 
 .btnQrDownload {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 32px;
-  background: var(--card);
+  gap: 6px;
+  height: 36px;
+  padding: 0 20px;
+  background: transparent;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--muted);
-  font-size: .72rem;
+  font-size: .75rem;
   font-weight: 600;
   font-family: var(--font-body);
   text-decoration: none;
-  letter-spacing: .06em;
+  letter-spacing: .05em;
   transition: border-color .2s, color .2s;
 }
 .btnQrDownload:hover {
@@ -181,14 +167,10 @@
 }
 
 .igLink {
-  font-size: .72rem;
+  font-size: .7rem;
   color: var(--muted);
   text-decoration: none;
-  opacity: .4;
+  opacity: .35;
   transition: opacity .2s;
 }
-
-.igLink:hover {
-  opacity: 1;
-  color: var(--gold);
-}
+.igLink:hover { opacity: 1; color: var(--gold); }

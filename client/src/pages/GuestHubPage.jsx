@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import s from './GuestHubPage.module.css'
 
 const BASE = import.meta.env.BASE_URL
@@ -33,7 +33,8 @@ export default function GuestHubPage() {
     <div className={s.page}>
       <div className={s.glow} />
 
-      <div className={s.content}>
+      {/* ── Main content (vertically centered) ── */}
+      <div className={s.main}>
         <header className={s.header}>
           <img src={logo} alt={info?.brand_name || 'Top DJ Group'} className={s.logo} />
           {info?.name && <h1 className={s.eventName}>{info.name}</h1>}
@@ -58,26 +59,24 @@ export default function GuestHubPage() {
             </a>
           ))}
         </nav>
-
-        <footer className={s.footer}>
-          {qr && (
-            <div className={s.qrBlock}>
-              <img src={qr.qr} alt="QR" className={s.qrImg} />
-              <a href={qr.qr} download="qr-evento.png" className={s.btnQrDownload}>
-                ⬇ Descargar QR
-              </a>
-            </div>
-          )}
-          <a
-            href={`https://instagram.com/${brand.replace('@', '')}`}
-            target="_blank"
-            rel="noreferrer"
-            className={s.igLink}
-          >
-            {brand}
-          </a>
-        </footer>
       </div>
+
+      {/* ── Footer (always at bottom) ── */}
+      <footer className={s.footer}>
+        {qr && (
+          <a href={qr.qr} download="qr-evento.png" className={s.btnQrDownload}>
+            ⬇ Descargar QR del evento
+          </a>
+        )}
+        <a
+          href={`https://instagram.com/${brand.replace('@', '')}`}
+          target="_blank"
+          rel="noreferrer"
+          className={s.igLink}
+        >
+          {brand}
+        </a>
+      </footer>
     </div>
   )
 }
