@@ -374,6 +374,12 @@ export default function GuestPage() {
       {/* ── Controls: Foto ── */}
       {mediaType === 'photo' && (
         <div className={s.controls}>
+          {videoEnabled && (
+            <div className={s.mediaTabsLandscape}>
+              <button className={`${s.mediaTab} ${s.mediaTabActive}`} onClick={() => switchMediaType('photo')}>📷 Foto</button>
+              <button className={s.mediaTab} onClick={() => switchMediaType('video')}>🎬 Video</button>
+            </div>
+          )}
           <div className={s.shootRow}>
             <button className={`${s.btnIcon} ${timerDelay > 0 ? s.btnIconActive : ''}`} onClick={toggleTimer} title="Temporizador" disabled={isPhotoPreview}>
               {timerDelay === 0 ? '⏱' : `${timerDelay}s`}
@@ -414,6 +420,12 @@ export default function GuestPage() {
       {/* ── Controls: Video ── */}
       {mediaType === 'video' && (
         <div className={s.controls}>
+          {videoEnabled && (
+            <div className={s.mediaTabsLandscape}>
+              <button className={s.mediaTab} onClick={() => switchMediaType('photo')}>📷 Foto</button>
+              <button className={`${s.mediaTab} ${s.mediaTabActive}`} onClick={() => switchMediaType('video')}>🎬 Video</button>
+            </div>
+          )}
           {(vidState === 'idle' || vidState === 'recording') && (
             <div className={s.shootRow}>
               <button className={s.btnIcon} onClick={flipCamera} disabled={vidState === 'recording'}>🔄</button>

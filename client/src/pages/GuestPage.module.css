@@ -27,6 +27,13 @@
   border: 1px solid var(--border);
   border-radius: 999px; padding: 3px;
 }
+.mediaTabsLandscape {
+  display: none;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px;
+}
 .mediaTab {
   height: 28px; padding: 0 12px;
   border-radius: 999px; border: none;
@@ -363,6 +370,8 @@
     justify-content: center;
     gap: 16px;
   }
+
+  .mediaTabsLandscape { display: flex; }
 
   /* Footer minimalista abajo de los controles */
   .footer {
