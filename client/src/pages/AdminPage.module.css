@@ -673,6 +673,15 @@
   transition: background .2s; white-space: nowrap;
 }
 .btnProjectVideo:hover { background: var(--accent-hover); }
+.btnModalHide {
+  height: 40px; padding: 0 16px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.18);
+  color: rgba(255,255,255,.6); border-radius: 10px;
+  font-size: .84rem; font-family: var(--font-body);
+  cursor: pointer; transition: all .2s; white-space: nowrap;
+}
+.btnModalHide:hover { border-color: rgba(255,150,0,.5); color: rgba(255,150,0,.9); }
 .btnVideoDelete {
   height: 40px; padding: 0 18px;
   background: rgba(231,76,60,.15);

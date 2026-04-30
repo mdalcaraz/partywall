@@ -362,13 +362,28 @@ export default function AdminPage() {
                 📽 Proyectar
               </button>
               <button
-                className={`${s.btnAlbumHide} ${mediaModal.inSlideshow ? s.btnAddListActive : ''}`}
+                className={`${s.btnAddList} ${mediaModal.inSlideshow ? s.btnAddListActive : ''}`}
                 onClick={() => {
                   mediaModal._type === 'video' ? toggleVideoSlide(mediaModal.id) : toggleSlide(mediaModal.id)
                   setMediaModal(m => ({ ...m, inSlideshow: !m.inSlideshow }))
                 }}
               >
                 {mediaModal.inSlideshow ? '✓ En lista' : '+ Lista'}
+              </button>
+              <button
+                className={s.btnModalHide}
+                onClick={() => {
+                  const item = mediaModal
+                  const isProjected = item._type === 'photo'
+                    ? currentId === item.id
+                    : currentVideoProj?.id === item.id
+                  if (item._type === 'photo') hidePhoto(item.id)
+                  else hideVideo(item.id)
+                  if (isProjected) clearDisplay()
+                  setMediaModal(null)
+                }}
+              >
+                🚫 Ocultar
               </button>
               {mediaModal._type === 'video'
                 ? <button className={s.btnVideoDelete} onClick={() => { deleteVideo(mediaModal.id); setMediaModal(null) }}>🗑 Eliminar</button>
