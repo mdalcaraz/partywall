@@ -233,8 +233,8 @@ export default function MusicPage() {
       <div className={s.hero}>
         <div className={s.heroBg} />
         <img src={brandLogo || `${BASE}logo.png`} alt="logo" className={s.heroLogo} />
-        <div className={s.heroTagline}>Pedí tu tema</div>
-        {eventName && <div className={s.heroEvent}>{eventName}</div>}
+        {eventName && <div className={s.heroTagline}>{eventName}</div>}
+        <div className={s.heroEvent}>Pedí tu canción</div>
       </div>
 
       {/* ── Search ── */}
