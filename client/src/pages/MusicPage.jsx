@@ -354,14 +354,13 @@ export default function MusicPage() {
 
       {/* ── Instagram sticky footer ── */}
       <div className={s.igFooter}>
-        <span className={s.igFooterText}>¿Te gustó la noche?</span>
         <a href={`https://www.instagram.com/${brandIg}`} target="_blank" rel="noreferrer" className={s.igBtn}>
           <IgIcon />
           Seguinos @{brandIg}
         </a>
         <span className={s.igFooterTerms}>
           Al usar esta app aceptás nuestros{' '}
-          <button className={s.igFooterTermsLink} onClick={() => setShowTerms(true)}>T&amp;C</button>
+          <button className={s.igFooterTermsLink} onClick={() => setShowTerms(true)}>Términos y Condiciones</button>
         </span>
       </div>
 
