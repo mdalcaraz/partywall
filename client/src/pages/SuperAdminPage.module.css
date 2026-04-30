@@ -55,6 +55,20 @@
 }
 .btnLogout:hover { border-color: var(--gold); color: var(--gold); }
 
+.btnPast {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.btnPast:hover { border-color: rgba(255,255,255,.4); color: var(--text); }
+
 /* ── Content ── */
 .content {
   flex: 1;

@@ -28,6 +28,7 @@ export default function SuperAdminPage() {
   const [form, setForm]       = useState(emptyForm)
   const [editId, setEditId]   = useState(null)
   const [view, setView]       = useState('list')
+  const [showPast, setShowPast] = useState(false)
   const [loading, setLoading] = useState(false)
   const [toast, setToast]     = useState({ msg: '', err: false, v: false })
   const [confirm, setConfirm] = useState(null)
@@ -148,12 +149,32 @@ export default function SuperAdminPage() {
     navigator.clipboard.writeText(hubUrl(id)).then(() => showToast('🔗 Link copiado'))
   }
 
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const visibleEvents = events
+    .filter(ev => {
+      const d = ev.date ? new Date(ev.date) : null
+      return showPast ? (d && d < today) : (!d || d >= today)
+    })
+    .sort((a, b) => {
+      const da = a.date ? new Date(a.date) : null
+      const db = b.date ? new Date(b.date) : null
+      if (!da && !db) return 0
+      if (!da) return 1
+      if (!db) return -1
+      return showPast ? db - da : da - db
+    })
+
   return (
     <div className={s.page}>
       <div className={s.topbar}>
         <img src={`${BASE}logo.png`} alt="Top DJ Group" className={s.logo} />
         <div className={s.title}>Super Admin</div>
         <div className={s.spacer} />
+        {view === 'list' && (
+          <button className={s.btnPast} onClick={() => setShowPast(p => !p)}>
+            {showPast ? '📅 Próximos' : '🕐 Pasados'}
+          </button>
+        )}
         {view === 'list' ? (
           <button className={s.btnNew} onClick={openCreate}>+ Nuevo evento</button>
         ) : (
@@ -165,14 +186,14 @@ export default function SuperAdminPage() {
       {/* ── LIST VIEW ── */}
       {view === 'list' && (
         <div className={s.content}>
-          {events.length === 0 ? (
+          {visibleEvents.length === 0 ? (
             <div className={s.empty}>
-              <div className={s.emptyIcon}>🎉</div>
-              <p>No hay eventos aún. Creá el primero.</p>
+              <div className={s.emptyIcon}>{showPast ? '📂' : '🎉'}</div>
+              <p>{showPast ? 'No hay eventos pasados.' : 'No hay eventos próximos. Creá el primero.'}</p>
             </div>
           ) : (
             <div className={s.eventList}>
-              {events.map((ev) => (
+              {visibleEvents.map((ev) => (
                 <div key={ev.id} className={`${s.eventCard} ${!ev.active ? s.eventCardInactive : ''}`}>
 
                   {/* ── Top row: name + controls ── */}

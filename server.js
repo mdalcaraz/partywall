@@ -359,19 +359,6 @@ app.get(`${BASE}/api/events`, requireSuperAdmin, async (req, res) => {
     const photo_count = await Photo.count({ where: { event_id: e.id } });
     return { ...e.toJSON(), photo_count };
   }));
-  // Upcoming events first (soonest → furthest), then past (most recent first), no-date last
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  result.sort((a, b) => {
-    const da = a.date ? new Date(a.date) : null;
-    const db = b.date ? new Date(b.date) : null;
-    if (!da && !db) return 0;
-    if (!da) return 1;
-    if (!db) return -1;
-    const aUp = da >= today, bUp = db >= today;
-    if (aUp && bUp) return da - db;   // both upcoming: soonest first
-    if (!aUp && !bUp) return db - da; // both past: most recent first
-    return aUp ? -1 : 1;             // upcoming before past
-  });
   res.json(result);
 });
 
