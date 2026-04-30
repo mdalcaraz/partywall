@@ -61,10 +61,9 @@ export default function AdminPage() {
 
     const onConnect    = () => setConnected(true)
     const onDisconnect = () => setConnected(false)
-    const onEstado     = ({ current, photos: ph, videos: vids, musicRequests: mr, musicEnabled: me }) => {
+    const onEstado     = ({ current, photos: ph, musicRequests: mr, musicEnabled: me }) => {
       setPhotos(ph || [])
       setCurrentId(current?.id ?? null)
-      if (Array.isArray(vids)) setAlbumVideos(vids)
       if (mr) setMusicRequests(mr)
       if (me !== undefined) setMusicEnabled(!!me)
     }
@@ -95,10 +94,11 @@ export default function AdminPage() {
       setAlbumVideos(prev => prev.filter(v => v.id !== id))
       setMediaModal(m => m?.id === id ? null : m)
     }
-    const onVideoError = ({ id }) => {
+    const onVideoError   = ({ id }) => {
       setAlbumVideos(prev => prev.map(v => v.id === id ? { ...v, status: 'error' } : v))
       showToast('❌ Error al procesar video', 'red')
     }
+    const onVideoOcultada = ({ id, hidden }) => setAlbumVideos(prev => prev.map(v => v.id === id ? { ...v, hidden } : v))
 
     // Music socket events
     const onMusicNueva       = (r)               => { setMusicRequests(prev => [...prev, r]); showToast(`🎵 ${r.artist_name} — ${r.track_name}`, 'green') }
@@ -123,6 +123,7 @@ export default function AdminPage() {
     socket.on('video_eliminada',       onVideoElim)
     socket.on('video_error',           onVideoError)
     socket.on('video_actualizada',     onVideoActualizada)
+    socket.on('video_ocultada',        onVideoOcultada)
     socket.on('music_nueva',           onMusicNueva)
     socket.on('music_actualizada',     onMusicActualizada)
     socket.on('music_eliminada',       onMusicEliminada)
@@ -145,6 +146,7 @@ export default function AdminPage() {
       socket.off('video_eliminada',       onVideoElim)
       socket.off('video_error',           onVideoError)
       socket.off('video_actualizada',     onVideoActualizada)
+      socket.off('video_ocultada',        onVideoOcultada)
       socket.off('music_nueva',           onMusicNueva)
       socket.off('music_actualizada',     onMusicActualizada)
       socket.off('music_eliminada',       onMusicEliminada)
