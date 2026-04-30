@@ -7,11 +7,16 @@ const BASE = import.meta.env.BASE_URL
 export default function GuestHubPage() {
   const { eventId } = useParams()
   const [info, setInfo] = useState(null)
+  const [qr, setQr]     = useState(null)
 
   useEffect(() => {
     fetch(`${BASE}api/e/${eventId}/hub`)
       .then(r => r.json())
       .then(setInfo)
+      .catch(() => {})
+    fetch(`${BASE}api/e/${eventId}/qr`)
+      .then(r => r.json())
+      .then(setQr)
       .catch(() => {})
   }, [eventId])
 
@@ -55,6 +60,14 @@ export default function GuestHubPage() {
         </nav>
 
         <footer className={s.footer}>
+          {qr && (
+            <div className={s.qrBlock}>
+              <img src={qr.qr} alt="QR" className={s.qrImg} />
+              <a href={qr.qr} download="qr-evento.png" className={s.btnQrDownload}>
+                ⬇ Descargar QR
+              </a>
+            </div>
+          )}
           <a
             href={`https://instagram.com/${brand.replace('@', '')}`}
             target="_blank"

@@ -399,7 +399,6 @@ export default function AdminPage() {
                     <img src={qr.qr} alt="QR Hub" />
                     <div className={s.qrTagline}>Subí tu foto · Pedí tu canción</div>
                     <div className={s.qrUrl}>{qr.url}</div>
-                    <a className={s.btnQrDownload} href={qr.qr} download="qr-hub.png">⬇ Descargar QR</a>
                   </>
                 ) : (
                   <div className={s.qrLoading}>Cargando...</div>

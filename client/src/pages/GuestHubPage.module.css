@@ -134,13 +134,57 @@
 /* ── Footer ── */
 .footer {
   margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.qrBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.qrImg {
+  width: 140px;
+  height: 140px;
+  border-radius: 8px;
+  display: block;
+}
+
+.btnQrDownload {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 32px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  text-decoration: none;
+  letter-spacing: .06em;
+  transition: border-color .2s, color .2s;
+}
+.btnQrDownload:hover {
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
 .igLink {
-  font-size: .75rem;
+  font-size: .72rem;
   color: var(--muted);
   text-decoration: none;
-  opacity: .5;
+  opacity: .4;
   transition: opacity .2s;
 }
 
