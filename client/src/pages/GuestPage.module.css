@@ -351,6 +351,7 @@
   .viewfinder {
     width: auto;
     height: calc(100dvh - 24px);
+    max-height: none;
     aspect-ratio: 16 / 9;
   }
 
