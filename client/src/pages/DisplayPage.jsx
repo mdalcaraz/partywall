@@ -62,12 +62,21 @@ export default function DisplayPage() {
   const [ssActive, setSsActive]         = useState(false)
   const [ssInterval, setSsInterval]     = useState(5000)
   const [ssProgress, setSsProgress]     = useState(0)
+  const [videoProgress, setVideoProgress] = useState(0)
+  const [photoShowTime, setPhotoShowTime] = useState(null)
   const [notif, setNotif]               = useState({ msg: '', visible: false })
   const [qrImg, setQrImg]               = useState(null)
-  const [musicQrImg, setMusicQrImg]     = useState(null)
   const [musicRequests, setMusicRequests] = useState([])
-  const notifTimer = useRef(null)
-  const ssTimer    = useRef(null)
+  const notifTimer  = useRef(null)
+  const ssTimer     = useRef(null)
+  const socketRef   = useRef(null)
+  const videoRef    = useRef(null)
+
+  useEffect(() => {
+    if (!videoRef.current || !currentVideo) return
+    videoRef.current.muted = true
+    videoRef.current.play().catch(() => {})
+  }, [currentVideo?.id])
 
   const playingTrack = musicRequests.find(r => r.status === 'playing') || null
 
@@ -76,22 +85,19 @@ export default function DisplayPage() {
     fetch(`${BASE}api/e/${eventId}/qr`)
       .then((r) => r.json())
       .then((data) => setQrImg(data.qr))
-    fetch(`${BASE}api/e/${eventId}/music/qr/public`)
-      .then((r) => r.json())
-      .then((data) => { if (data.enabled && data.qr) setMusicQrImg(data.qr) })
-      .catch(() => {})
   }, [eventId])
 
   useEffect(() => {
     if (!eventId) return
     const socket = getSocket(eventId)
+    socketRef.current = socket
 
     const onEstado    = ({ current, musicRequests: mr }) => {
       if (current) { showImage(current.url); setHasPhoto(true) }
       if (mr) setMusicRequests(mr)
     }
-    const onMostrar      = (photo) => { if (!photo) { showImage(null); setHasPhoto(false); return }; setCurrentVideo(null); showImage(photo.url); setHasPhoto(true) }
-    const onMostrarVideo = (video) => { if (!video) { setCurrentVideo(null); return }; showImage(null); setHasPhoto(false); setCurrentVideo(video) }
+    const onMostrar      = (photo) => { if (!photo) { showImage(null); setHasPhoto(false); return }; setCurrentVideo(null); setVideoProgress(0); showImage(photo.url); setHasPhoto(true); setPhotoShowTime(Date.now()) }
+    const onMostrarVideo = (video) => { if (!video) { setCurrentVideo(null); return }; showImage(null); setHasPhoto(false); setVideoProgress(0); setCurrentVideo(video) }
     const onNueva     = () => showNotif('📸 Nueva foto recibida')
     const onSlideshow = ({ active, interval }) => { setSsActive(active); if (active && interval) setSsInterval(interval) }
 
@@ -127,12 +133,12 @@ export default function DisplayPage() {
     clearInterval(ssTimer.current)
     if (!ssActive) { setSsProgress(0); return }
     setSsProgress(0)
-    const start = Date.now()
+    const start = photoShowTime || Date.now()
     ssTimer.current = setInterval(() => {
       setSsProgress(Math.min(((Date.now() - start) / ssInterval) * 100, 100))
     }, 50)
     return () => clearInterval(ssTimer.current)
-  }, [ssActive, ssInterval])
+  }, [ssActive, ssInterval, photoShowTime])
 
   const particles = Array.from({ length: 18 }, (_, i) => ({
     size:  3 + (i * 7) % 6,
@@ -177,10 +183,15 @@ export default function DisplayPage() {
       {currentVideo && (
         <div className={s.videoStage}>
           <video
+            ref={videoRef}
             key={currentVideo.id}
             src={currentVideo.url}
-            autoPlay
             playsInline
+            onTimeUpdate={(e) => {
+              const v = e.currentTarget
+              if (v.duration) setVideoProgress((v.currentTime / v.duration) * 100)
+            }}
+            onEnded={() => { setVideoProgress(0); socketRef.current?.emit('video_slideshow_ended', { eventId, videoId: currentVideo.id }) }}
             className={s.videoPlayer}
           />
         </div>
@@ -191,21 +202,26 @@ export default function DisplayPage() {
         <span className={s.igHandle}>@topdjgroup</span>
       </div>
 
-      {musicQrImg && (
-        <div className={s.qrCornerLeft}>
-          <div className={s.qrLabel}>Pedí tu tema</div>
-          <img src={musicQrImg} alt="QR Música" className={s.qrImg} />
-        </div>
-      )}
-
       {qrImg && (
         <div className={s.qrCorner}>
-          <div className={s.qrLabel}>Enviá tu foto</div>
           <img src={qrImg} alt="QR" className={s.qrImg} />
+          <div className={s.qrTagline}>
+            <span className={s.qrTaglineMain}>Subí tu foto</span>
+            <span className={s.qrTaglineSep}>·</span>
+            <span className={s.qrTaglineMain}>Pedí tu canción</span>
+          </div>
         </div>
       )}
 
-      {ssActive && <div className={s.ssBar} style={{ width: `${ssProgress}%` }} />}
+      {(ssActive || !!currentVideo) && (
+        <div
+          className={s.ssBar}
+          style={{
+            width: `${currentVideo ? videoProgress : ssProgress}%`,
+            transition: currentVideo ? 'width 250ms linear' : undefined,
+          }}
+        />
+      )}
 
       <MusicOverlay request={playingTrack} />
 

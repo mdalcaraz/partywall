@@ -13,6 +13,7 @@ const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const ffmpeg   = require('fluent-ffmpeg');
 const sharp    = require('sharp');
+try { ffmpeg.setFfmpegPath(process.env.FFMPEG_PATH || require('child_process').execSync('which ffmpeg').toString().trim()) } catch { ffmpeg.setFfmpegPath('/usr/bin/ffmpeg') }
 const { sequelize, Event, Photo, MusicRequest, Video } = require('./models');
 
 // ── Config ────────────────────────────────────────────────────────────────
@@ -79,30 +80,58 @@ const slideshowTimers = new Map();
 
 function getSsState(eventId) {
   if (!slideshowTimers.has(eventId))
-    slideshowTimers.set(eventId, { timer: null, interval: 5000, active: false });
+    slideshowTimers.set(eventId, { timer: null, interval: 5000, active: false, idx: -1, waitingForVideo: false, currentVideoId: null });
   return slideshowTimers.get(eventId);
+}
+
+async function showNextItem(eventId) {
+  const ss = getSsState(eventId);
+  if (!ss.active) return;
+  if (ss.timer) { clearTimeout(ss.timer); ss.timer = null; }
+
+  const [photos, videos] = await Promise.all([
+    Photo.findAll({ where: { event_id: eventId, in_slideshow: true, hidden: false, deleted_at: null }, order: [['timestamp', 'ASC']] }),
+    Video.findAll({ where: { event_id: eventId, in_slideshow: true, hidden: false, deleted_at: null, status: 'ready' }, order: [['timestamp', 'ASC']] }),
+  ]);
+
+  const items = [
+    ...photos.map(p => ({ type: 'photo', data: normalize(p), ts: new Date(p.timestamp).getTime() })),
+    ...videos.map(v => ({ type: 'video', data: normalizeVideo(v), ts: new Date(v.timestamp).getTime() })),
+  ].sort((a, b) => a.ts - b.ts);
+
+  if (!items.length) return;
+
+  ss.idx = (ss.idx + 1) % items.length;
+  const item = items[ss.idx];
+
+  if (item.type === 'photo') {
+    ss.waitingForVideo = false;
+    io.to(`event:${eventId}`).emit('mostrar_foto', item.data);
+    io.to(`event:${eventId}`).emit('mostrar_video', null);
+    ss.timer = setTimeout(() => showNextItem(eventId), ss.interval);
+  } else {
+    ss.waitingForVideo = true;
+    ss.currentVideoId = item.data.id;
+    io.to(`event:${eventId}`).emit('mostrar_video', item.data);
+    io.to(`event:${eventId}`).emit('mostrar_foto', null);
+    // no timer — avanza cuando DisplayPage emite video_slideshow_ended con el mismo videoId
+  }
 }
 
 function startSlideshow(eventId) {
   stopSlideshow(eventId);
   const ss = getSsState(eventId);
-  let idx = -1;
   ss.active = true;
-  ss.timer = setInterval(async () => {
-    const photos = await Photo.findAll({
-      where:   { event_id: eventId, in_slideshow: true, hidden: false, deleted_at: null },
-      order:   [['timestamp', 'ASC']],
-    });
-    if (!photos.length) return;
-    idx = (idx + 1) % photos.length;
-    io.to(`event:${eventId}`).emit('mostrar_foto', normalize(photos[idx]));
-  }, ss.interval);
+  ss.idx = -1;
+  showNextItem(eventId);
 }
 
 function stopSlideshow(eventId) {
   const ss = getSsState(eventId);
-  if (ss.timer) { clearInterval(ss.timer); ss.timer = null; }
+  if (ss.timer) { clearTimeout(ss.timer); ss.timer = null; }
   ss.active = false;
+  ss.waitingForVideo = false;
+  ss.currentVideoId = null;
 }
 
 // ── Spotify token cache ───────────────────────────────────────────────────
@@ -449,13 +478,39 @@ app.get(`${BASE}/api/e/:eventId/guest/info`, async (req, res) => {
   res.json({ active: true, rateLimit });
 });
 
+app.get(`${BASE}/api/e/:eventId/hub`, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
+  res.json({
+    name:            event.name,
+    date:            event.date            || null,
+    location:        event.location        || null,
+    active:          !!event.active,
+    music_enabled:   !!event.music_enabled,
+    brand_name:      event.brand_name      || 'Top DJ Group',
+    brand_logo_url:  event.brand_logo_url  || null,
+    brand_instagram: event.brand_instagram || '@topdjgroup',
+  });
+});
+
 app.get(`${BASE}/api/e/:eventId/qr`, async (req, res) => {
   const event = await Event.findByPk(req.params.eventId);
   if (!event) return res.status(404).json({ error: 'Evento no encontrado' });
   const base = TUNNEL_URL || `http://${LOCAL_IP}:${PORT}`;
-  const url  = `${base}${BASE}/e/${req.params.eventId}/guest`;
+  const url  = `${base}${BASE}/e/${req.params.eventId}`;
   const qr   = await QRCode.toDataURL(url, { width: 300, margin: 2, color: { dark: '#000', light: '#fff' } });
   res.json({ url, qr });
+});
+
+app.get(`${BASE}/api/e/:eventId/qr/image`, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event) return res.status(404).end();
+  const base = TUNNEL_URL || `http://${LOCAL_IP}:${PORT}`;
+  const url  = `${base}${BASE}/e/${req.params.eventId}`;
+  const buf  = await QRCode.toBuffer(url, { width: 400, margin: 3, color: { dark: '#000', light: '#fff' } });
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Content-Disposition', `attachment; filename="qr-${event.name.replace(/[^a-z0-9]/gi, '_')}.png"`);
+  res.send(buf);
 });
 
 app.patch(`${BASE}/api/e/:eventId/photos/:photoId/slideshow`, requireAnyAdmin, async (req, res) => {
@@ -817,8 +872,8 @@ app.get(`${BASE}/api/e/:eventId/album/info`, async (req, res) => {
 
 app.get(`${BASE}/api/e/:eventId/album`, async (req, res) => {
   const [photos, videos] = await Promise.all([
-    Photo.findAll({ where: { event_id: req.params.eventId, deleted_at: null }, order: [['timestamp', 'DESC']] }),
-    Video.findAll({ where: { event_id: req.params.eventId, deleted_at: null, status: 'ready' }, order: [['timestamp', 'DESC']] }),
+    Photo.findAll({ where: { event_id: req.params.eventId, deleted_at: null, hidden: false }, order: [['timestamp', 'DESC']] }),
+    Video.findAll({ where: { event_id: req.params.eventId, deleted_at: null, status: 'ready', hidden: false }, order: [['timestamp', 'DESC']] }),
   ]);
   res.json({ photos: photos.map(normalize), videos: videos.map(normalizeVideo) });
 });
@@ -829,7 +884,7 @@ app.get(`${BASE}/api/e/:eventId/album/download`, async (req, res) => {
 
   const { ids } = req.query;
   const idList  = ids ? ids.split(',').filter(Boolean) : null;
-  const where   = { event_id: req.params.eventId, deleted_at: null };
+  const where   = { event_id: req.params.eventId, deleted_at: null, hidden: false };
   if (idList?.length) where.id = idList;
 
   const photos = await Photo.findAll({ where, order: [['timestamp', 'ASC']] });
@@ -848,7 +903,7 @@ app.get(`${BASE}/api/e/:eventId/album/download`, async (req, res) => {
 
   // include videos in ZIP (only if downloading all, not partial by id)
   if (!idList?.length) {
-    const videos = await Video.findAll({ where: { event_id: req.params.eventId, deleted_at: null, status: 'ready' }, order: [['timestamp', 'ASC']] });
+    const videos = await Video.findAll({ where: { event_id: req.params.eventId, deleted_at: null, status: 'ready', hidden: false }, order: [['timestamp', 'ASC']] });
     for (const video of videos) {
       const filePath = path.join('storage', req.params.eventId, 'videos', video.filename);
       if (video.filename && fs.existsSync(filePath)) archive.file(filePath, { name: video.filename });
@@ -916,6 +971,15 @@ io.on('connection', (socket) => {
     ss.interval = interval || 5000;
     startSlideshow(eventId);
     io.to(`event:${eventId}`).emit('slideshow_estado', { active: true, interval: ss.interval });
+  });
+
+  socket.on('video_slideshow_ended', ({ eventId, videoId }) => {
+    const ss = getSsState(eventId);
+    if (ss.active && ss.waitingForVideo && ss.currentVideoId === videoId) {
+      ss.waitingForVideo = false;
+      ss.currentVideoId = null;
+      showNextItem(eventId);
+    }
   });
 
   socket.on('slideshow_stop', ({ eventId }) => {

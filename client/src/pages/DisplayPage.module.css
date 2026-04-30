@@ -89,40 +89,44 @@
   text-transform: uppercase;
 }
 
-/* ── QR corners ── */
-.qrCorner,
-.qrCornerLeft {
+/* ── QR corner ── */
+.qrCorner {
   position: fixed;
   bottom: 28px;
+  right: 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   z-index: 4;
-  background: rgba(8,8,8,.7);
-  backdrop-filter: blur(10px);
+  background: rgba(8,8,8,.75);
+  backdrop-filter: blur(12px);
   border: 1px solid rgba(0,232,144,.25);
-  border-radius: 14px;
-  padding: 10px 10px 8px;
-}
-.qrCorner     { right: 28px; }
-.qrCornerLeft { left: 28px; }
-.qrLabel {
-  font-family: var(--font-body);
-  font-size: clamp(.5rem, .9vw, .68rem);
-  font-weight: 500;
-  color: rgba(0,232,144,.85);
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  text-align: center;
-  max-width: 120px;
-  line-height: 1.4;
+  border-radius: 16px;
+  padding: 12px 12px 10px;
 }
 .qrImg {
-  width: clamp(160px, 18vw, 260px);
-  height: clamp(160px, 18vw, 260px);
+  width: clamp(140px, 16vw, 220px);
+  height: clamp(140px, 16vw, 220px);
   border-radius: 8px;
   display: block;
+}
+.qrTagline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.qrTaglineMain {
+  font-family: var(--font-body);
+  font-size: clamp(.48rem, .85vw, .66rem);
+  font-weight: 600;
+  color: rgba(255,255,255,.9);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.qrTaglineSep {
+  font-size: clamp(.4rem, .7vw, .55rem);
+  color: rgba(0,232,144,.6);
 }
 
 /* ── Video stage ── */

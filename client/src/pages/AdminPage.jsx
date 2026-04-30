@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getSocket, disconnectSocket } from '../lib/socket'
 import { authFetch, decodeToken, clearToken } from '../lib/api'
+import ConfirmModal from '../components/ConfirmModal'
 import s from './AdminPage.module.css'
 
 const INTERVALS = [3, 5, 10, 15]
@@ -14,8 +15,9 @@ export default function AdminPage() {
   const eventId           = paramId ?? payload?.eventId
 
   // Photos state
-  const [photos, setPhotos]         = useState([])
-  const [currentId, setCurrentId]   = useState(null)
+  const [photos, setPhotos]             = useState([])
+  const [currentId, setCurrentId]       = useState(null)
+  const [currentVideoProj, setCurrentVideoProj] = useState(null)
   const [ssActive, setSsActive]     = useState(false)
   const [ssInterval, setSsInterval] = useState(3)
   const [qr, setQr]                 = useState(null)
@@ -24,10 +26,18 @@ export default function AdminPage() {
   const [panelMode, setPanelMode]   = useState('proyeccion') // 'proyeccion' | 'album'
   const [albumPhotos, setAlbumPhotos] = useState([])
   const [albumVideos, setAlbumVideos] = useState([])
-  const [videoModal, setVideoModal]   = useState(null) // null | { video }
+  const [mediaModal, setMediaModal]   = useState(null) // null | item con _type
   const [showQrs, setShowQrs]       = useState(false)
-  const toastTimer = useRef(null)
-  const socketRef  = useRef(null)
+  const [confirm, setConfirm]       = useState(null) // { message, confirmLabel, onConfirm }
+  const toastTimer    = useRef(null)
+  const socketRef     = useRef(null)
+  const currentVidRef = useRef(null)
+
+  useEffect(() => {
+    if (!currentVidRef.current || !currentVideoProj) return
+    currentVidRef.current.muted = true
+    currentVidRef.current.play().catch(() => {})
+  }, [currentVideoProj?.id])
 
   // Music state
   const [musicEnabled, setMusicEnabled]   = useState(false)
@@ -69,7 +79,8 @@ export default function AdminPage() {
       setAlbumPhotos((prev) => prev.filter((p) => p.id !== id))
       setCurrentId((cur) => (cur === id ? null : cur))
     }
-    const onMostrar    = (photo)          => setCurrentId(photo?.id ?? null)
+    const onMostrar      = (photo) => { setCurrentId(photo?.id ?? null); if (photo) setCurrentVideoProj(null) }
+    const onMostrarVideo = (video) => { setCurrentVideoProj(video || null); if (video) setCurrentId(null) }
     const onSlideshow  = ({ active })     => setSsActive(active)
     const onActualizada = ({ id, inSlideshow }) => setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow } : p))
     const onOcultada   = ({ id, hidden }) => {
@@ -78,12 +89,18 @@ export default function AdminPage() {
     }
 
     // Video socket events
-    const onVideoNueva = (video) => { setAlbumVideos(prev => [video, ...prev]); showToast('🎬 Nuevo video recibido', 'green') }
-    const onVideoLista = (video) => setAlbumVideos(prev => prev.map(v => v.id === video.id ? video : v))
+    const onVideoNueva      = (video) => { setAlbumVideos(prev => [video, ...prev]); showToast('🎬 Nuevo video recibido', 'green') }
+    const onVideoLista      = (video) => setAlbumVideos(prev => prev.map(v => v.id === video.id ? video : v))
+    const onVideoActualizada = ({ id, inSlideshow }) => setAlbumVideos(prev => prev.map(v => v.id === id ? { ...v, inSlideshow } : v))
     const onVideoElim  = ({ id }) => {
       setAlbumVideos(prev => prev.filter(v => v.id !== id))
-      setVideoModal(m => m?.video?.id === id ? null : m)
+      setMediaModal(m => m?.id === id ? null : m)
     }
+    const onVideoError   = ({ id }) => {
+      setAlbumVideos(prev => prev.map(v => v.id === id ? { ...v, status: 'error' } : v))
+      showToast('❌ Error al procesar video', 'red')
+    }
+    const onVideoOcultada = ({ id, hidden }) => setAlbumVideos(prev => prev.map(v => v.id === id ? { ...v, hidden } : v))
 
     // Music socket events
     const onMusicNueva       = (r)               => { setMusicRequests(prev => [...prev, r]); showToast(`🎵 ${r.artist_name} — ${r.track_name}`, 'green') }
@@ -99,12 +116,16 @@ export default function AdminPage() {
     socket.on('nueva_foto',            onNueva)
     socket.on('foto_eliminada',        onEliminada)
     socket.on('mostrar_foto',          onMostrar)
+    socket.on('mostrar_video',         onMostrarVideo)
     socket.on('slideshow_estado',      onSlideshow)
     socket.on('foto_actualizada',      onActualizada)
     socket.on('foto_ocultada',         onOcultada)
     socket.on('video_nueva',           onVideoNueva)
     socket.on('video_lista',           onVideoLista)
     socket.on('video_eliminada',       onVideoElim)
+    socket.on('video_error',           onVideoError)
+    socket.on('video_actualizada',     onVideoActualizada)
+    socket.on('video_ocultada',        onVideoOcultada)
     socket.on('music_nueva',           onMusicNueva)
     socket.on('music_actualizada',     onMusicActualizada)
     socket.on('music_eliminada',       onMusicEliminada)
@@ -118,12 +139,16 @@ export default function AdminPage() {
       socket.off('nueva_foto',            onNueva)
       socket.off('foto_eliminada',        onEliminada)
       socket.off('mostrar_foto',          onMostrar)
+      socket.off('mostrar_video',         onMostrarVideo)
       socket.off('slideshow_estado',      onSlideshow)
       socket.off('foto_actualizada',      onActualizada)
       socket.off('foto_ocultada',         onOcultada)
       socket.off('video_nueva',           onVideoNueva)
       socket.off('video_lista',           onVideoLista)
       socket.off('video_eliminada',       onVideoElim)
+      socket.off('video_error',           onVideoError)
+      socket.off('video_actualizada',     onVideoActualizada)
+      socket.off('video_ocultada',        onVideoOcultada)
       socket.off('music_nueva',           onMusicNueva)
       socket.off('music_actualizada',     onMusicActualizada)
       socket.off('music_eliminada',       onMusicEliminada)
@@ -148,21 +173,19 @@ export default function AdminPage() {
 
   // ── Photo actions ─────────────────────────────────────────────────────────
   const project      = (photo) => { socketRef.current?.emit('proyectar', { eventId, photo }); showToast('Foto proyectada') }
-  const clearDisplay = () => { socketRef.current?.emit('proyectar', { eventId, photo: null }); setCurrentId(null); showToast('Pantalla apagada') }
-  const deletePhoto  = (id) => { authFetch(`${BASE}api/e/${eventId}/photos/${id}`, { method: 'DELETE' }) }
+  const clearDisplay = () => { socketRef.current?.emit('proyectar', { eventId, photo: null }); setCurrentId(null); setCurrentVideoProj(null); showToast('Pantalla apagada') }
+  const deletePhoto  = (id) => setConfirm({ message: '¿Eliminar esta foto? Esta acción no se puede deshacer.', confirmLabel: 'Eliminar foto', onConfirm: () => { authFetch(`${BASE}api/e/${eventId}/photos/${id}`, { method: 'DELETE' }); setConfirm(null) } })
   const toggleSlide  = (id) => {
     setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow: !p.inSlideshow } : p))
     authFetch(`${BASE}api/e/${eventId}/photos/${id}/slideshow`, { method: 'PATCH' })
-      .then((r) => {
-        if (!r.ok) {
-          setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow: !p.inSlideshow } : p))
-          showToast('Error al actualizar')
-        }
-      })
+      .then((r) => { if (!r.ok) setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow: !p.inSlideshow } : p)) })
   }
-  const clearAll = () => {
-    Promise.all(photos.map((p) => authFetch(`${BASE}api/e/${eventId}/photos/${p.id}`, { method: 'DELETE' }))).then(() => showToast('Fotos eliminadas'))
+  const toggleVideoSlide = (id) => {
+    setAlbumVideos((prev) => prev.map((v) => v.id === id ? { ...v, inSlideshow: !v.inSlideshow } : v))
+    authFetch(`${BASE}api/e/${eventId}/videos/${id}/slideshow`, { method: 'PATCH' })
+      .then((r) => { if (!r.ok) setAlbumVideos((prev) => prev.map((v) => v.id === id ? { ...v, inSlideshow: !v.inSlideshow } : v)) })
   }
+  const clearAll = () => setConfirm({ message: `¿Eliminar todas las fotos (${photos.length})? Esta acción no se puede deshacer.`, confirmLabel: 'Eliminar todas', onConfirm: () => { Promise.all(photos.map((p) => authFetch(`${BASE}api/e/${eventId}/photos/${p.id}`, { method: 'DELETE' }))).then(() => showToast('Fotos eliminadas')); setConfirm(null) } })
   const toggleSlideshow = () => {
     if (ssActive) socketRef.current?.emit('slideshow_stop', { eventId })
     else socketRef.current?.emit('slideshow_start', { eventId, interval: ssInterval * 1000 })
@@ -178,27 +201,26 @@ export default function AdminPage() {
   // ── Video actions ─────────────────────────────────────────────────────────
   const projectVideo = (video) => {
     socketRef.current?.emit('proyectar_video', { eventId, video })
-    setVideoModal(null)
-    showToast('🎬 Video proyectado')
+    setMediaModal(null)
+  showToast('🎬 Video proyectado')
   }
   const hideVideo = (id) => {
     setAlbumVideos((prev) => prev.map((v) => v.id === id ? { ...v, hidden: !v.hidden } : v))
     authFetch(`${BASE}api/e/${eventId}/videos/${id}/hide`, { method: 'PATCH' })
       .then((r) => { if (!r.ok) setAlbumVideos((prev) => prev.map((v) => v.id === id ? { ...v, hidden: !v.hidden } : v)) })
   }
-  const deleteVideo = (id) => {
-    authFetch(`${BASE}api/e/${eventId}/videos/${id}`, { method: 'DELETE' })
-    setVideoModal((m) => (m?.video?.id === id ? null : m))
-  }
+  const deleteVideo = (id) => setConfirm({ message: '¿Eliminar este video? Esta acción no se puede deshacer.', confirmLabel: 'Eliminar video', onConfirm: () => { authFetch(`${BASE}api/e/${eventId}/videos/${id}`, { method: 'DELETE' }); setMediaModal((m) => (m?.id === id ? null : m)); setConfirm(null) } })
 
   // ── Music actions ─────────────────────────────────────────────────────────
-  const deleteRequest = async (id) => {
-    await authFetch(`${BASE}api/e/${eventId}/music/requests/${id}`, { method: 'DELETE' })
-  }
+  const deleteRequest = (id) => setConfirm({ message: '¿Eliminar esta solicitud de música?', confirmLabel: 'Eliminar', onConfirm: () => { authFetch(`${BASE}api/e/${eventId}/music/requests/${id}`, { method: 'DELETE' }); setConfirm(null) } })
 
   const currentPhoto = photos.find((p) => p.id === currentId) ?? null
-  const playlist     = photos.filter((p) => p.inSlideshow)
-  const totalAlbum   = albumPhotos.length + albumVideos.length
+  const allMedia = [
+    ...photos.map(p => ({ ...p, _type: 'photo' })),
+    ...albumVideos.filter(v => v.status === 'ready').map(v => ({ ...v, _type: 'video' })),
+  ].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+  const playlist = allMedia.filter(m => m.inSlideshow)
+  const totalAlbum = albumPhotos.length + albumVideos.length
 
   return (
     <div className={s.page}>
@@ -214,6 +236,15 @@ export default function AdminPage() {
           </button>
         </div>
         <div className={s.spacer} />
+        <a
+          href={`${BASE}e/${eventId}`}
+          target="_blank"
+          rel="noreferrer"
+          className={s.btnAlbumLink}
+          title="Hub de invitados"
+        >
+          🔗 Hub ↗
+        </a>
         <a
           href={`${BASE}e/${eventId}/album`}
           target="_blank"
@@ -253,18 +284,18 @@ export default function AdminPage() {
                   )}
                   <div className={s.albumGrid}>
                     {albumPhotos.map((photo) => (
-                      <div key={photo.id} className={`${s.albumCard} ${photo.hidden ? s.albumCardHidden : ''}`}>
+                      <div key={photo.id} className={`${s.albumCard} ${photo.hidden ? s.albumCardHidden : ''}`} onClick={() => setMediaModal({ ...photo, _type: 'photo' })}>
                         <img src={photo.url} loading="lazy" alt="" />
                         {photo.hidden && <div className={s.hiddenBadge}>Oculta</div>}
                         <div className={s.albumOverlay}>
                           <div className={s.albumOverlayActions}>
                             <button
                               className={`${s.btnAlbumHide} ${photo.hidden ? s.btnAlbumHideActive : ''}`}
-                              onClick={() => hidePhoto(photo.id)}
+                              onClick={(e) => { e.stopPropagation(); hidePhoto(photo.id) }}
                             >
                               {photo.hidden ? '👁 Mostrar' : '🚫 Ocultar'}
                             </button>
-                            <button className={s.btnAlbumDelete} onClick={() => deletePhoto(photo.id)}>🗑</button>
+                            <button className={s.btnAlbumDelete} onClick={(e) => { e.stopPropagation(); deletePhoto(photo.id) }}>🗑</button>
                           </div>
                         </div>
                       </div>
@@ -282,7 +313,7 @@ export default function AdminPage() {
                       <div
                         key={video.id}
                         className={`${s.albumCard} ${video.status === 'ready' ? s.videoAlbumCard : ''} ${video.hidden ? s.albumCardHidden : ''}`}
-                        onClick={() => video.status === 'ready' && setVideoModal({ video })}
+                        onClick={() => video.status === 'ready' && setMediaModal({ ...video, _type: 'video' })}
                       >
                         {video.thumbnail_url
                           ? <img src={video.thumbnail_url} loading="lazy" alt="" />
@@ -290,6 +321,7 @@ export default function AdminPage() {
                         }
                         {video.status === 'processing' && <div className={s.videoProcBadge}>Procesando...</div>}
                         {video.status === 'ready' && <div className={s.videoPlayIcon}>▶</div>}
+                        {video.status === 'error' && <div className={s.videoErrBadge}>❌ Error</div>}
                         {video.hidden && <div className={s.hiddenBadge}>Oculto</div>}
                         <div className={s.albumOverlay}>
                           <div className={s.albumOverlayActions}>
@@ -317,26 +349,32 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── Video preview modal ── */}
-      {videoModal && (
-        <div className={s.videoModal} onClick={() => setVideoModal(null)}>
+      {/* ── Media preview modal (fotos + videos) ── */}
+      {mediaModal && (
+        <div className={s.videoModal} onClick={() => setMediaModal(null)}>
           <div className={s.videoModalInner} onClick={(e) => e.stopPropagation()}>
-            <video
-              key={videoModal.video.id}
-              src={videoModal.video.url}
-              controls
-              autoPlay
-              playsInline
-              className={s.videoModalPlayer}
-            />
+            {mediaModal._type === 'video'
+              ? <video key={mediaModal.id} src={mediaModal.url} controls autoPlay muted playsInline className={s.videoModalPlayer} />
+              : <img src={mediaModal.url} className={s.photoModalImg} alt="" />
+            }
             <div className={s.videoModalActions}>
-              <button className={s.btnProjectVideo} onClick={() => projectVideo(videoModal.video)}>
-                📽 Proyectar en display
+              <button className={s.btnProjectVideo} onClick={() => { mediaModal._type === 'video' ? projectVideo(mediaModal) : project(mediaModal); setMediaModal(null) }}>
+                📽 Proyectar
               </button>
-              <button className={s.btnVideoDelete} onClick={() => deleteVideo(videoModal.video.id)}>
-                🗑 Eliminar
+              <button
+                className={`${s.btnAlbumHide} ${mediaModal.inSlideshow ? s.btnAddListActive : ''}`}
+                onClick={() => {
+                  mediaModal._type === 'video' ? toggleVideoSlide(mediaModal.id) : toggleSlide(mediaModal.id)
+                  setMediaModal(m => ({ ...m, inSlideshow: !m.inSlideshow }))
+                }}
+              >
+                {mediaModal.inSlideshow ? '✓ En lista' : '+ Lista'}
               </button>
-              <button className={s.btnModalClose} onClick={() => setVideoModal(null)}>✕</button>
+              {mediaModal._type === 'video'
+                ? <button className={s.btnVideoDelete} onClick={() => { deleteVideo(mediaModal.id); setMediaModal(null) }}>🗑 Eliminar</button>
+                : <button className={s.btnVideoDelete} onClick={() => { deletePhoto(mediaModal.id); setMediaModal(null) }}>🗑 Eliminar</button>
+              }
+              <button className={s.btnModalClose} onClick={() => setMediaModal(null)}>✕</button>
             </div>
           </div>
         </div>
@@ -351,17 +389,16 @@ export default function AdminPage() {
               <span className={s.qrToggleIcon}>{showQrs ? '▲' : '▼'}</span>
             </button>
             {showQrs && (
-              <div className={s.qrRow}>
-                <div className={s.qrBlock}>
-                  <div className={s.qrLabel}>Fotos</div>
-                  {qr ? (<><img src={qr.qr} alt="QR" /><div className={s.qrUrl}>{qr.url}</div></>) : (<div className={s.qrLoading}>Cargando...</div>)}
-                </div>
-                {musicEnabled && musicQr && (
-                  <div className={s.qrBlock}>
-                    <div className={s.qrLabel}>Música</div>
-                    <img src={musicQr.qr} alt="QR Música" />
-                    <div className={s.qrUrl}>{musicQr.url}</div>
-                  </div>
+              <div className={s.qrBlock}>
+                <div className={s.qrLabel}>Hub de invitados</div>
+                {qr ? (
+                  <>
+                    <img src={qr.qr} alt="QR Hub" />
+                    <div className={s.qrTagline}>Subí tu foto · Pedí tu canción</div>
+                    <div className={s.qrUrl}>{qr.url}</div>
+                  </>
+                ) : (
+                  <div className={s.qrLoading}>Cargando...</div>
                 )}
               </div>
             )}
@@ -370,7 +407,23 @@ export default function AdminPage() {
           <div className={s.sideSection}>
             <div className={s.sectionLabel}>Proyectando ahora</div>
             <div className={s.currentBlock}>
-              {currentPhoto ? (<><img src={currentPhoto.url} alt="actual" /><div className={s.currentBadge}>EN VIVO</div></>) : (<div className={s.noImage}><span>📽️</span><span>Nada proyectado</span></div>)}
+              {currentVideoProj ? (
+                <>
+                  <video
+                    ref={currentVidRef}
+                    key={currentVideoProj.id}
+                    src={currentVideoProj.url}
+                    playsInline
+                    loop
+                    className={s.currentVideoPreview}
+                  />
+                  <div className={s.currentBadge}>EN VIVO</div>
+                </>
+              ) : currentPhoto ? (
+                <><img src={currentPhoto.url} alt="actual" /><div className={s.currentBadge}>EN VIVO</div></>
+              ) : (
+                <div className={s.noImage}><span>📽️</span><span>Nada proyectado</span></div>
+              )}
             </div>
             <button className={s.btnSs} onClick={clearDisplay}>⬛ Pantalla negra</button>
           </div>
@@ -400,60 +453,89 @@ export default function AdminPage() {
           {/* ── Panel: Fotos ── */}
           <div className={`${s.panelPhotos} ${musicEnabled ? '' : s.panelFull}`}>
             <div className={s.panelHeader}>
-              <div className={s.panelTitle}>📸 Fotos</div>
-              <div className={s.photoCount}>{photos.length} foto{photos.length !== 1 ? 's' : ''}</div>
-              <button className={s.btnClearAll} onClick={clearAll}>🗑 Borrar todas</button>
+              <div className={s.panelTitle}>📸 Media</div>
+              <div className={s.photoCount}>{allMedia.length} elemento{allMedia.length !== 1 ? 's' : ''}</div>
+              <button className={s.btnClearAll} onClick={clearAll}>🗑 Borrar fotos</button>
             </div>
 
             {/* ── Playlist strip ── */}
             <div className={s.playlistSection}>
               <div className={s.playlistHeader}>
                 <span className={s.playlistLabel}>Lista de reproducción</span>
-                <span className={s.playlistCount}>{playlist.length} foto{playlist.length !== 1 ? 's' : ''}</span>
+                <span className={s.playlistCount}>{playlist.length} elemento{playlist.length !== 1 ? 's' : ''}</span>
               </div>
               {playlist.length === 0 ? (
-                <div className={s.playlistEmpty}>Vacía · Usá "+ Lista" en cada foto para agregarla</div>
+                <div className={s.playlistEmpty}>Vacía · Usá "+ Lista" en cada elemento para agregarlo</div>
               ) : (
                 <div className={s.playlistStrip}>
-                  {playlist.map((photo) => (
-                    <div key={photo.id} className={`${s.playlistItem} ${photo.id === currentId ? s.playlistItemActive : ''}`}>
-                      <img src={photo.url} alt="" className={s.playlistThumb} />
-                      <button className={s.btnRemoveFromList} onClick={() => toggleSlide(photo.id)} title="Quitar de lista">×</button>
+                  {playlist.map((item) => (
+                    <div key={item.id} className={`${s.playlistItem} ${item.id === currentId ? s.playlistItemActive : ''}`}>
+                      {item._type === 'video'
+                        ? <div className={s.playlistVideoThumb}>{item.thumbnail_url ? <img src={item.thumbnail_url} alt="" className={s.playlistThumb} /> : '🎬'}<span className={s.playlistVideoBadge}>▶</span></div>
+                        : <img src={item.url} alt="" className={s.playlistThumb} />
+                      }
+                      <button className={s.btnRemoveFromList} onClick={() => item._type === 'video' ? toggleVideoSlide(item.id) : toggleSlide(item.id)} title="Quitar de lista">×</button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* ── Photo grid ── */}
+            {/* ── Media grid unificada ── */}
             <div className={s.photoGrid}>
-              {photos.length === 0 ? (
+              {allMedia.length === 0 ? (
                 <div className={s.emptyState}>
                   <div className={s.emptyIcon}>📭</div>
-                  <p>Aún no hay fotos. Los invitados escanean el QR para empezar.</p>
+                  <p>Aún no hay fotos ni videos. Los invitados escanean el QR para empezar.</p>
                 </div>
-              ) : (
-                photos.map((photo, i) => (
-                  <div key={photo.id} className={`${s.photoCard} ${photo.id === currentId ? s.photoCardActive : ''}`}>
-                    <img src={photo.url} loading="lazy" alt="foto" />
-                    {i === 0 && photo._new && <div className={s.newBadge}>NUEVA</div>}
-                    {photo.id === currentId && <div className={s.activeBadge}>✦ Activa</div>}
-                    {photo.inSlideshow && <div className={s.inListBadge}>✓ Lista</div>}
-                    <div className={s.photoOverlay}>
-                      <div className={s.overlayActions}>
-                        <button className={s.btnProject} onClick={() => project(photo)}>📽 Proyectar</button>
-                        <button
-                          className={`${s.btnAddList} ${photo.inSlideshow ? s.btnAddListActive : ''}`}
-                          onClick={(e) => { e.stopPropagation(); toggleSlide(photo.id) }}
-                        >
-                          {photo.inSlideshow ? '✓' : '+ Lista'}
-                        </button>
-                        <button className={s.btnDelete} onClick={() => deletePhoto(photo.id)} title="Eliminar">🗑</button>
+              ) : (() => {
+                const groupsMap = {}
+                const groupsOrder = []
+                allMedia.forEach(item => {
+                  const d = item.timestamp ? new Date(item.timestamp) : null
+                  const key = d
+                    ? `${d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })} · ${d.getHours()}:00`
+                    : 'Sin fecha'
+                  if (!groupsMap[key]) { groupsMap[key] = []; groupsOrder.push(key) }
+                  groupsMap[key].push(item)
+                })
+                return groupsOrder.map((key) => (
+                  <Fragment key={key}>
+                    <div className={s.mediaGroupLabel}>{key}</div>
+                    {groupsMap[key].map((item) => (
+                      <div
+                        key={item.id}
+                        className={`${s.photoCard} ${item._type === 'video' ? s.photoCardVideo : ''} ${item.id === currentId ? s.photoCardActive : ''}`}
+                        onClick={() => setMediaModal(item)}
+                      >
+                        {item._type === 'video'
+                          ? <>{item.thumbnail_url ? <img src={item.thumbnail_url} loading="lazy" alt="" /> : <div className={s.videoThumbPlaceholder}>🎬</div>}<div className={s.videoPlayIcon}>▶</div></>
+                          : <img src={item.url} loading="lazy" alt="foto" />
+                        }
+                        {item._new && <div className={s.newBadge}>NUEVA</div>}
+                        {item.id === currentId && <div className={s.activeBadge}>✦ Activa</div>}
+                        {item.inSlideshow && <div className={s.inListBadge}>✓ Lista</div>}
+                        <div className={s.photoOverlay}>
+                          <div className={s.overlayActions}>
+                            <button
+                              className={s.btnProject}
+                              onClick={(e) => { e.stopPropagation(); item._type === 'video' ? projectVideo(item) : project(item) }}
+                            >
+                              📽 Proyectar
+                            </button>
+                            <button
+                              className={`${s.btnAddList} ${item.inSlideshow ? s.btnAddListActive : ''}`}
+                              onClick={(e) => { e.stopPropagation(); item._type === 'video' ? toggleVideoSlide(item.id) : toggleSlide(item.id) }}
+                            >
+                              {item.inSlideshow ? '✓ Lista' : '+ Lista'}
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    ))}
+                  </Fragment>
                 ))
-              )}
+              })()}
             </div>
           </div>
 
@@ -501,6 +583,15 @@ export default function AdminPage() {
       <div className={`${s.toast} ${toast.visible ? s.toastShow : ''} ${toast.type === 'green' ? s.toastGreen : ''}`}>
         {toast.msg}
       </div>
+
+      {confirm && (
+        <ConfirmModal
+          message={confirm.message}
+          confirmLabel={confirm.confirmLabel}
+          onConfirm={confirm.onConfirm}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
     </div>
   )
 }
