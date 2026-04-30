@@ -80,7 +80,7 @@ const slideshowTimers = new Map();
 
 function getSsState(eventId) {
   if (!slideshowTimers.has(eventId))
-    slideshowTimers.set(eventId, { timer: null, interval: 5000, active: false, idx: -1, waitingForVideo: false });
+    slideshowTimers.set(eventId, { timer: null, interval: 5000, active: false, idx: -1, waitingForVideo: false, currentVideoId: null });
   return slideshowTimers.get(eventId);
 }
 
@@ -111,9 +111,10 @@ async function showNextItem(eventId) {
     ss.timer = setTimeout(() => showNextItem(eventId), ss.interval);
   } else {
     ss.waitingForVideo = true;
+    ss.currentVideoId = item.data.id;
     io.to(`event:${eventId}`).emit('mostrar_video', item.data);
     io.to(`event:${eventId}`).emit('mostrar_foto', null);
-    // no timer — avanza cuando DisplayPage emite video_slideshow_ended
+    // no timer — avanza cuando DisplayPage emite video_slideshow_ended con el mismo videoId
   }
 }
 
@@ -130,6 +131,7 @@ function stopSlideshow(eventId) {
   if (ss.timer) { clearTimeout(ss.timer); ss.timer = null; }
   ss.active = false;
   ss.waitingForVideo = false;
+  ss.currentVideoId = null;
 }
 
 // ── Spotify token cache ───────────────────────────────────────────────────
@@ -498,6 +500,17 @@ app.get(`${BASE}/api/e/:eventId/qr`, async (req, res) => {
   const url  = `${base}${BASE}/e/${req.params.eventId}`;
   const qr   = await QRCode.toDataURL(url, { width: 300, margin: 2, color: { dark: '#000', light: '#fff' } });
   res.json({ url, qr });
+});
+
+app.get(`${BASE}/api/e/:eventId/qr/image`, async (req, res) => {
+  const event = await Event.findByPk(req.params.eventId);
+  if (!event) return res.status(404).end();
+  const base = TUNNEL_URL || `http://${LOCAL_IP}:${PORT}`;
+  const url  = `${base}${BASE}/e/${req.params.eventId}`;
+  const buf  = await QRCode.toBuffer(url, { width: 400, margin: 3, color: { dark: '#000', light: '#fff' } });
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Content-Disposition', `attachment; filename="qr-${event.name.replace(/[^a-z0-9]/gi, '_')}.png"`);
+  res.send(buf);
 });
 
 app.patch(`${BASE}/api/e/:eventId/photos/:photoId/slideshow`, requireAnyAdmin, async (req, res) => {
@@ -960,10 +973,11 @@ io.on('connection', (socket) => {
     io.to(`event:${eventId}`).emit('slideshow_estado', { active: true, interval: ss.interval });
   });
 
-  socket.on('video_slideshow_ended', ({ eventId }) => {
+  socket.on('video_slideshow_ended', ({ eventId, videoId }) => {
     const ss = getSsState(eventId);
-    if (ss.active && ss.waitingForVideo) {
+    if (ss.active && ss.waitingForVideo && ss.currentVideoId === videoId) {
       ss.waitingForVideo = false;
+      ss.currentVideoId = null;
       showNextItem(eventId);
     }
   });

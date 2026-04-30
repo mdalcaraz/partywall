@@ -7,27 +7,25 @@ const BASE = import.meta.env.BASE_URL
 export default function GuestHubPage() {
   const { eventId } = useParams()
   const [info, setInfo] = useState(null)
-  const [qr, setQr]     = useState(null)
 
   useEffect(() => {
     fetch(`${BASE}api/e/${eventId}/hub`)
       .then(r => r.json())
       .then(setInfo)
       .catch(() => {})
-    fetch(`${BASE}api/e/${eventId}/qr`)
-      .then(r => r.json())
-      .then(setQr)
-      .catch(() => {})
   }, [eventId])
 
-  const links = [
+  const links = info ? [
     { to: `${BASE}e/${eventId}/guest`,  emoji: '📸', label: 'Subir foto',    sub: 'Aparece en la pantalla del evento' },
-    { to: `${BASE}e/${eventId}/music`,  emoji: '🎵', label: 'Pedir canción', sub: 'Pedile una canción al DJ',         show: info?.music_enabled },
+    info.music_enabled
+      ? { to: `${BASE}e/${eventId}/music`, emoji: '🎵', label: 'Pedir canción', sub: 'Pedile una canción al DJ' }
+      : null,
     { to: `${BASE}e/${eventId}/album`,  emoji: '🖼', label: 'Ver álbum',     sub: 'Todas las fotos del evento' },
-  ].filter(l => l.show !== false)
+  ].filter(Boolean) : []
 
   const logo  = info?.brand_logo_url || `${BASE}logo.png`
   const brand = info?.brand_instagram || '@topdjgroup'
+  const qrDownloadUrl = `${BASE}api/e/${eventId}/qr/image`
 
   return (
     <div className={s.page}>
@@ -63,11 +61,9 @@ export default function GuestHubPage() {
 
       {/* ── Footer (always at bottom) ── */}
       <footer className={s.footer}>
-        {qr && (
-          <a href={qr.qr} download="qr-evento.png" className={s.btnQrDownload}>
-            ⬇ Descargar QR del evento
-          </a>
-        )}
+        <a href={qrDownloadUrl} download="qr-evento.png" className={s.btnQrDownload}>
+          ⬇ Descargar QR del evento
+        </a>
         <a
           href={`https://instagram.com/${brand.replace('@', '')}`}
           target="_blank"

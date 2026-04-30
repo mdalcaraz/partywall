@@ -191,7 +191,7 @@ export default function DisplayPage() {
               const v = e.currentTarget
               if (v.duration) setVideoProgress((v.currentTime / v.duration) * 100)
             }}
-            onEnded={() => { setVideoProgress(0); socketRef.current?.emit('video_slideshow_ended', { eventId }) }}
+            onEnded={() => { setVideoProgress(0); socketRef.current?.emit('video_slideshow_ended', { eventId, videoId: currentVideo.id }) }}
             className={s.videoPlayer}
           />
         </div>
