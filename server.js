@@ -859,8 +859,8 @@ app.get(`${BASE}/api/e/:eventId/album/info`, async (req, res) => {
 
 app.get(`${BASE}/api/e/:eventId/album`, async (req, res) => {
   const [photos, videos] = await Promise.all([
-    Photo.findAll({ where: { event_id: req.params.eventId, deleted_at: null }, order: [['timestamp', 'DESC']] }),
-    Video.findAll({ where: { event_id: req.params.eventId, deleted_at: null, status: 'ready' }, order: [['timestamp', 'DESC']] }),
+    Photo.findAll({ where: { event_id: req.params.eventId, deleted_at: null, hidden: false }, order: [['timestamp', 'DESC']] }),
+    Video.findAll({ where: { event_id: req.params.eventId, deleted_at: null, status: 'ready', hidden: false }, order: [['timestamp', 'DESC']] }),
   ]);
   res.json({ photos: photos.map(normalize), videos: videos.map(normalizeVideo) });
 });
@@ -871,7 +871,7 @@ app.get(`${BASE}/api/e/:eventId/album/download`, async (req, res) => {
 
   const { ids } = req.query;
   const idList  = ids ? ids.split(',').filter(Boolean) : null;
-  const where   = { event_id: req.params.eventId, deleted_at: null };
+  const where   = { event_id: req.params.eventId, deleted_at: null, hidden: false };
   if (idList?.length) where.id = idList;
 
   const photos = await Photo.findAll({ where, order: [['timestamp', 'ASC']] });
@@ -890,7 +890,7 @@ app.get(`${BASE}/api/e/:eventId/album/download`, async (req, res) => {
 
   // include videos in ZIP (only if downloading all, not partial by id)
   if (!idList?.length) {
-    const videos = await Video.findAll({ where: { event_id: req.params.eventId, deleted_at: null, status: 'ready' }, order: [['timestamp', 'ASC']] });
+    const videos = await Video.findAll({ where: { event_id: req.params.eventId, deleted_at: null, status: 'ready', hidden: false }, order: [['timestamp', 'ASC']] });
     for (const video of videos) {
       const filePath = path.join('storage', req.params.eventId, 'videos', video.filename);
       if (video.filename && fs.existsSync(filePath)) archive.file(filePath, { name: video.filename });
