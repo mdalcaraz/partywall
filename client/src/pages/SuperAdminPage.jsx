@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authFetch, clearToken } from '../lib/api'
+import ConfirmModal from '../components/ConfirmModal'
 import s from './SuperAdminPage.module.css'
 
 const BASE = import.meta.env.BASE_URL
@@ -29,6 +30,7 @@ export default function SuperAdminPage() {
   const [view, setView]       = useState('list')
   const [loading, setLoading] = useState(false)
   const [toast, setToast]     = useState({ msg: '', err: false, v: false })
+  const [confirm, setConfirm] = useState(null)
   let toastTimer = null
 
   const logout = () => { clearToken(); navigate('/login', { replace: true }) }
@@ -127,12 +129,16 @@ export default function SuperAdminPage() {
     load()
   }
 
-  const deleteEvent = async (ev) => {
-    if (!confirm(`¿Eliminar el evento "${ev.name}" y todas sus fotos?`)) return
-    await authFetch(`${BASE}api/events/${ev.id}`, { method: 'DELETE' })
-    showToast('Evento eliminado')
-    load()
-  }
+  const deleteEvent = (ev) => setConfirm({
+    message: `¿Eliminar el evento "${ev.name}" y todas sus fotos? Esta acción no se puede deshacer.`,
+    confirmLabel: 'Eliminar evento',
+    onConfirm: async () => {
+      await authFetch(`${BASE}api/events/${ev.id}`, { method: 'DELETE' })
+      showToast('Evento eliminado')
+      load()
+      setConfirm(null)
+    },
+  })
 
   const hubUrl     = (id) => `${window.location.origin}${BASE}e/${id}`
   const displayUrl = (id) => `${window.location.origin}${BASE}e/${id}/display`
@@ -351,6 +357,15 @@ export default function SuperAdminPage() {
       )}
 
       <div className={`${s.toast} ${toast.v ? s.toastShow : ''} ${toast.err ? s.toastErr : ''}`}>{toast.msg}</div>
+
+      {confirm && (
+        <ConfirmModal
+          message={confirm.message}
+          confirmLabel={confirm.confirmLabel}
+          onConfirm={confirm.onConfirm}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
     </div>
   )
 }

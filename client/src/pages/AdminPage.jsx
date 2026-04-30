@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, Fragment } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getSocket, disconnectSocket } from '../lib/socket'
 import { authFetch, decodeToken, clearToken } from '../lib/api'
+import ConfirmModal from '../components/ConfirmModal'
 import s from './AdminPage.module.css'
 
 const INTERVALS = [3, 5, 10, 15]
@@ -27,6 +28,7 @@ export default function AdminPage() {
   const [albumVideos, setAlbumVideos] = useState([])
   const [mediaModal, setMediaModal]   = useState(null) // null | item con _type
   const [showQrs, setShowQrs]       = useState(false)
+  const [confirm, setConfirm]       = useState(null) // { message, confirmLabel, onConfirm }
   const toastTimer    = useRef(null)
   const socketRef     = useRef(null)
   const currentVidRef = useRef(null)
@@ -172,7 +174,7 @@ export default function AdminPage() {
   // ── Photo actions ─────────────────────────────────────────────────────────
   const project      = (photo) => { socketRef.current?.emit('proyectar', { eventId, photo }); showToast('Foto proyectada') }
   const clearDisplay = () => { socketRef.current?.emit('proyectar', { eventId, photo: null }); setCurrentId(null); setCurrentVideoProj(null); showToast('Pantalla apagada') }
-  const deletePhoto  = (id) => { authFetch(`${BASE}api/e/${eventId}/photos/${id}`, { method: 'DELETE' }) }
+  const deletePhoto  = (id) => setConfirm({ message: '¿Eliminar esta foto? Esta acción no se puede deshacer.', confirmLabel: 'Eliminar foto', onConfirm: () => { authFetch(`${BASE}api/e/${eventId}/photos/${id}`, { method: 'DELETE' }); setConfirm(null) } })
   const toggleSlide  = (id) => {
     setPhotos((prev) => prev.map((p) => p.id === id ? { ...p, inSlideshow: !p.inSlideshow } : p))
     authFetch(`${BASE}api/e/${eventId}/photos/${id}/slideshow`, { method: 'PATCH' })
@@ -183,9 +185,7 @@ export default function AdminPage() {
     authFetch(`${BASE}api/e/${eventId}/videos/${id}/slideshow`, { method: 'PATCH' })
       .then((r) => { if (!r.ok) setAlbumVideos((prev) => prev.map((v) => v.id === id ? { ...v, inSlideshow: !v.inSlideshow } : v)) })
   }
-  const clearAll = () => {
-    Promise.all(photos.map((p) => authFetch(`${BASE}api/e/${eventId}/photos/${p.id}`, { method: 'DELETE' }))).then(() => showToast('Fotos eliminadas'))
-  }
+  const clearAll = () => setConfirm({ message: `¿Eliminar todas las fotos (${photos.length})? Esta acción no se puede deshacer.`, confirmLabel: 'Eliminar todas', onConfirm: () => { Promise.all(photos.map((p) => authFetch(`${BASE}api/e/${eventId}/photos/${p.id}`, { method: 'DELETE' }))).then(() => showToast('Fotos eliminadas')); setConfirm(null) } })
   const toggleSlideshow = () => {
     if (ssActive) socketRef.current?.emit('slideshow_stop', { eventId })
     else socketRef.current?.emit('slideshow_start', { eventId, interval: ssInterval * 1000 })
@@ -209,15 +209,10 @@ export default function AdminPage() {
     authFetch(`${BASE}api/e/${eventId}/videos/${id}/hide`, { method: 'PATCH' })
       .then((r) => { if (!r.ok) setAlbumVideos((prev) => prev.map((v) => v.id === id ? { ...v, hidden: !v.hidden } : v)) })
   }
-  const deleteVideo = (id) => {
-    authFetch(`${BASE}api/e/${eventId}/videos/${id}`, { method: 'DELETE' })
-    setMediaModal((m) => (m?.id === id ? null : m))
-  }
+  const deleteVideo = (id) => setConfirm({ message: '¿Eliminar este video? Esta acción no se puede deshacer.', confirmLabel: 'Eliminar video', onConfirm: () => { authFetch(`${BASE}api/e/${eventId}/videos/${id}`, { method: 'DELETE' }); setMediaModal((m) => (m?.id === id ? null : m)); setConfirm(null) } })
 
   // ── Music actions ─────────────────────────────────────────────────────────
-  const deleteRequest = async (id) => {
-    await authFetch(`${BASE}api/e/${eventId}/music/requests/${id}`, { method: 'DELETE' })
-  }
+  const deleteRequest = (id) => setConfirm({ message: '¿Eliminar esta solicitud de música?', confirmLabel: 'Eliminar', onConfirm: () => { authFetch(`${BASE}api/e/${eventId}/music/requests/${id}`, { method: 'DELETE' }); setConfirm(null) } })
 
   const currentPhoto = photos.find((p) => p.id === currentId) ?? null
   const allMedia = [
@@ -588,6 +583,15 @@ export default function AdminPage() {
       <div className={`${s.toast} ${toast.visible ? s.toastShow : ''} ${toast.type === 'green' ? s.toastGreen : ''}`}>
         {toast.msg}
       </div>
+
+      {confirm && (
+        <ConfirmModal
+          message={confirm.message}
+          confirmLabel={confirm.confirmLabel}
+          onConfirm={confirm.onConfirm}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
     </div>
   )
 }

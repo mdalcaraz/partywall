@@ -1,0 +1,59 @@
+.overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.7);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+
+.dialog {
+  background: #1a1a1a;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px;
+  padding: 28px 24px 20px;
+  max-width: 340px;
+  width: 100%;
+  display: flex; flex-direction: column; gap: 20px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.6);
+}
+
+.message {
+  margin: 0;
+  font-size: .95rem;
+  color: rgba(255,255,255,.85);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.actions {
+  display: flex; gap: 10px;
+}
+
+.btnCancel {
+  flex: 1; height: 42px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 10px;
+  color: rgba(255,255,255,.55);
+  font-size: .88rem; font-family: inherit;
+  cursor: pointer; transition: all .2s;
+}
+.btnCancel:hover {
+  border-color: rgba(255,255,255,.3);
+  color: rgba(255,255,255,.8);
+}
+
+.btnConfirm {
+  flex: 1; height: 42px;
+  background: rgba(220,50,50,.18);
+  border: 1px solid rgba(220,50,50,.45);
+  border-radius: 10px;
+  color: #ff6b6b;
+  font-size: .88rem; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: all .2s;
+}
+.btnConfirm:hover {
+  background: rgba(220,50,50,.32);
+  border-color: rgba(220,50,50,.7);
+  color: #ff8a8a;
+}
